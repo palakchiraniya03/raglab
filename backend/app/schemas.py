@@ -36,3 +36,9 @@ class RetrievalResult(BaseModel):
 class RetrievalResponse(BaseModel):
     query: str
     results: List[RetrievalResult]
+
+class GenerationRequest(BaseModel):
+    prompt: str
+
+class GenerationResponse(BaseModel):
+    text: str

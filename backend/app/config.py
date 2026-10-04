@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "nomic-embed-text"
     QDRANT_COLLECTION: str = "raglab_documents"
 
+    # Phase 4 Configuration
+    GENERATION_MODEL: str = "gemma3:1b"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

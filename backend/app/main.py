@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.api import documents, retrieval
+from app.api import documents, retrieval, generation
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
@@ -16,6 +16,7 @@ app.add_middleware(
 
 app.include_router(documents.router, prefix=settings.API_PREFIX)
 app.include_router(retrieval.router, prefix=settings.API_PREFIX)
+app.include_router(generation.router, prefix=settings.API_PREFIX)
 
 @app.get(f"{settings.API_PREFIX}/health")
 async def health_check():
