@@ -1,0 +1,1 @@
+# Vector Storage Service placeholder
