@@ -6,6 +6,10 @@ from typing import Optional
 from app.schemas import IngestResponse, ChunkResponse, ChunkMetadata
 from app.services.parsing import parse_document, DocumentParsingError
 from app.services.chunking import chunk_text
+from app.services.embeddings import embed_text, EmbeddingError
+from app.services.vector_storage import init_collection_if_needed, upsert_points, VectorStorageError
+from qdrant_client.http.models import PointStruct
+from app.config import settings
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -83,11 +87,77 @@ async def ingest_document(
     if not chunks_response:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No valid text chunks could be generated")
 
+    # Phase 3: Embed and Store in Qdrant
+    import uuid
+
+    points_to_upsert = []
+    
+    # Try embedding the first chunk to determine dimension
+    try:
+        first_embedding = await embed_text(chunks_response[0].text)
+        dimension = len(first_embedding)
+    except EmbeddingError as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
+        
+    # Initialize collection based on detected dimension
+    try:
+        init_collection_if_needed(dimension)
+    except VectorStorageError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+    # Prepare point for first chunk
+    payload_dict = chunks_response[0].metadata.model_dump()
+    payload_dict["text"] = chunks_response[0].text
+    
+    # Deterministic point ID: SHA-256 of document_id + ":" + chunk_index
+    # We take the first 32 hex chars to form a valid UUID-like hex string for Qdrant, 
+    # Qdrant accepts UUID or unsigned integer. We can hash to a UUID string.
+    def get_point_id(doc_id: str, c_index: int) -> str:
+        hash_str = hashlib.sha256(f"{doc_id}:{c_index}".encode()).hexdigest()
+        # Format as UUID: 8-4-4-4-12
+        return f"{hash_str[:8]}-{hash_str[8:12]}-{hash_str[12:16]}-{hash_str[16:20]}-{hash_str[20:32]}"
+
+    points_to_upsert.append(
+        PointStruct(
+            id=get_point_id(document_id, chunks_response[0].metadata.chunk_index),
+            vector=first_embedding,
+            payload=payload_dict
+        )
+    )
+
+    # Embed and prepare remaining chunks
+    for cr in chunks_response[1:]:
+        try:
+            vec = await embed_text(cr.text)
+        except EmbeddingError as e:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Embedding failed at chunk {cr.metadata.chunk_index}: {str(e)}")
+            
+        payload_dict = cr.metadata.model_dump()
+        payload_dict["text"] = cr.text
+        
+        points_to_upsert.append(
+            PointStruct(
+                id=get_point_id(document_id, cr.metadata.chunk_index),
+                vector=vec,
+                payload=payload_dict
+            )
+        )
+        
+    # Upsert all points to Qdrant
+    try:
+        upsert_points(points_to_upsert)
+    except VectorStorageError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+
     return IngestResponse(
         document_id=document_id,
         filename=file.filename,
         file_type=ext[1:],
         total_characters=total_characters,
         total_chunks=len(chunks_response),
+        embedded_chunks=len(points_to_upsert),
+        collection=settings.QDRANT_COLLECTION,
         chunks=chunks_response
     )

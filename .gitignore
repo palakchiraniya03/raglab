@@ -8,3 +8,6 @@ __pycache__/
 venv/
 .venv/
 .DS_Store
+backend/qdrant_data/
+.pytest_cache/
+

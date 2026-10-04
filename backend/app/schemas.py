@@ -20,4 +20,19 @@ class IngestResponse(BaseModel):
     file_type: str
     total_characters: int
     total_chunks: int
+    embedded_chunks: int
+    collection: str
     chunks: List[ChunkResponse]
+
+class RetrievalRequest(BaseModel):
+    query: str
+    top_k: int = 5
+
+class RetrievalResult(BaseModel):
+    text: str
+    score: float
+    metadata: dict
+
+class RetrievalResponse(BaseModel):
+    query: str
+    results: List[RetrievalResult]
