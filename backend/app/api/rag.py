@@ -16,7 +16,7 @@ async def ask_question(request: RetrievalRequest):
 
     # 1. Retrieve chunks
     try:
-        retrieved_chunks = await search_chunks(query=request.query, top_k=request.top_k)
+        retrieved_chunks = await search_chunks(query=request.query, top_k=request.top_k, document_id=request.document_id)
     except RetrievalError as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Retrieval failed: {str(e)}")
     except Exception as e:

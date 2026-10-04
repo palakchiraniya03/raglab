@@ -14,7 +14,7 @@ async def search_documents(request: RetrievalRequest):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="top_k must be a positive integer")
         
     try:
-        results = await search_chunks(query=request.query, top_k=request.top_k)
+        results = await search_chunks(query=request.query, top_k=request.top_k, document_id=request.document_id)
     except RetrievalError as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
     except Exception as e:

@@ -60,14 +60,22 @@ def upsert_points(points: List[PointStruct]) -> None:
     except Exception as e:
         raise VectorStorageError(f"Failed to upsert points to Qdrant: {str(e)}")
 
-def search_vectors(query_vector: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
+def search_vectors(query_vector: List[float], top_k: int = 5, document_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Search Qdrant for similar vectors.
     """
     try:
+        query_filter = None
+        if document_id:
+            from qdrant_client.http.models import Filter, FieldCondition, MatchValue
+            query_filter = Filter(
+                must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))]
+            )
+            
         results = client.search(
             collection_name=settings.QDRANT_COLLECTION,
             query_vector=query_vector,
+            query_filter=query_filter,
             limit=top_k
         )
         return results

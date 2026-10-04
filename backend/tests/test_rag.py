@@ -56,7 +56,7 @@ def test_rag_success(mock_search_chunks, mock_generate_text):
     assert len(data["sources"]) == expected_count
     assert data["sources"][0]["text"] == "The Laplacian matrix is L = D - A."
 
-    mock_search_chunks.assert_called_once_with(query="What is the Laplacian matrix?", top_k=2)
+    mock_search_chunks.assert_called_once_with(query="What is the Laplacian matrix?", top_k=2, document_id=None)
     mock_generate_text.assert_called_once()
 
     # Verify prompt construction

@@ -27,7 +27,9 @@ def _calculate_lexical_boost(query: str, chunk_text: str) -> float:
 
     return (overlap / len(query_tokens)) * MAX_LEXICAL_BOOST
 
-async def search_chunks(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+from typing import List, Dict, Any, Optional
+
+async def search_chunks(query: str, top_k: int = 5, document_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Embeds the query and searches Qdrant for top_k similar chunks.
     """
@@ -45,7 +47,7 @@ async def search_chunks(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
 
     # Search vector store
     try:
-        raw_results = search_vectors(query_vector=query_vector, top_k=top_k)
+        raw_results = search_vectors(query_vector=query_vector, top_k=top_k, document_id=document_id)
     except VectorStorageError as e:
         raise RetrievalError(f"Vector search failed: {str(e)}")
 

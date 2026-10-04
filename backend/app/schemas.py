@@ -34,6 +34,7 @@ class IngestResponse(BaseModel):
 class RetrievalRequest(BaseModel):
     query: str
     top_k: int = 5
+    document_id: Optional[str] = None
 
 class RetrievalResult(BaseModel):
     text: str
