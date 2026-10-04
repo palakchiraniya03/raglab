@@ -42,3 +42,7 @@ class GenerationRequest(BaseModel):
 
 class GenerationResponse(BaseModel):
     text: str
+
+class RAGResponse(BaseModel):
+    answer: str
+    sources: List[RetrievalResult]
