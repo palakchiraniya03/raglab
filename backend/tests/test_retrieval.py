@@ -51,3 +51,55 @@ def test_retrieval_invalid_top_k():
         json={"query": "valid query", "top_k": 0}
     )
     assert response.status_code == 400
+
+@pytest.mark.asyncio
+@patch("app.services.retrieval.embed_text", new_callable=AsyncMock)
+@patch("app.services.retrieval.search_vectors")
+async def test_search_chunks_threshold(mock_search, mock_embed):
+    from app.services.retrieval import search_chunks
+    from app.config import settings
+    
+    mock_embed.return_value = [0.1, 0.2]
+    
+    # Mock Qdrant results
+    mock_search.return_value = [
+        ScoredPoint(id=1, version=1, score=settings.RETRIEVAL_SCORE_THRESHOLD + 0.1, payload={"text": "High score", "doc_id": "1"}),
+        ScoredPoint(id=2, version=1, score=settings.RETRIEVAL_SCORE_THRESHOLD, payload={"text": "Exact threshold", "doc_id": "2"}),
+        ScoredPoint(id=3, version=1, score=settings.RETRIEVAL_SCORE_THRESHOLD - 0.1, payload={"text": "Low score", "doc_id": "3"}),
+    ]
+    
+    results = await search_chunks("query", top_k=3)
+    
+    # Only 2 should remain
+    assert len(results) == 2
+    assert results[0]["text"] == "High score"
+    assert results[1]["text"] == "Exact threshold"
+
+@pytest.mark.asyncio
+@patch("app.services.retrieval.embed_text", new_callable=AsyncMock)
+@patch("app.services.retrieval.search_vectors")
+async def test_search_chunks_all_below_threshold(mock_search, mock_embed):
+    from app.services.retrieval import search_chunks
+    from app.config import settings
+    
+    mock_embed.return_value = [0.1, 0.2]
+    
+    mock_search.return_value = [
+        ScoredPoint(id=3, version=1, score=settings.RETRIEVAL_SCORE_THRESHOLD - 0.1, payload={"text": "Low score", "doc_id": "3"}),
+        ScoredPoint(id=4, version=1, score=settings.RETRIEVAL_SCORE_THRESHOLD - 0.2, payload={"text": "Lower score", "doc_id": "4"}),
+    ]
+    
+    results = await search_chunks("query", top_k=2)
+    assert len(results) == 0
+
+@pytest.mark.asyncio
+@patch("app.services.retrieval.embed_text", new_callable=AsyncMock)
+@patch("app.services.retrieval.search_vectors")
+async def test_search_chunks_retrieval_error(mock_search, mock_embed):
+    from app.services.retrieval import search_chunks, VectorStorageError, RetrievalError
+    
+    mock_embed.return_value = [0.1, 0.2]
+    mock_search.side_effect = VectorStorageError("DB failed")
+    
+    with pytest.raises(RetrievalError, match="Vector search failed"):
+        await search_chunks("query")

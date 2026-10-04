@@ -28,8 +28,13 @@ async def search_chunks(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         raise RetrievalError(f"Vector search failed: {str(e)}")
         
     # Format results
+    from app.config import settings
+    
     formatted_results = []
     for hit in raw_results:
+        if hit.score < settings.RETRIEVAL_SCORE_THRESHOLD:
+            continue
+            
         payload = hit.payload or {}
         # Ensure 'text' is extracted from payload, and the rest is metadata
         text = payload.get("text", "")
