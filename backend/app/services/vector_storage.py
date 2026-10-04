@@ -153,3 +153,19 @@ def get_document_info(document_id: str) -> Optional[Dict[str, Any]]:
         }
     except Exception as e:
         raise VectorStorageError(f"Failed to get document info: {str(e)}")
+
+def delete_document(document_id: str) -> None:
+    """Delete all chunks belonging to a document from Qdrant."""
+    try:
+        collections = client.get_collections().collections
+        if not any(c.name == settings.QDRANT_COLLECTION for c in collections):
+            return
+
+        client.delete(
+            collection_name=settings.QDRANT_COLLECTION,
+            points_selector=Filter(
+                must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))]
+            )
+        )
+    except Exception as e:
+        raise VectorStorageError(f"Failed to delete document: {str(e)}")

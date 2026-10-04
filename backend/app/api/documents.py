@@ -7,7 +7,7 @@ from app.schemas import IngestResponse, ChunkResponse, ChunkMetadata, DocumentIt
 from app.services.parsing import parse_document, DocumentParsingError
 from app.services.chunking import chunk_text
 from app.services.embeddings import embed_text, EmbeddingError
-from app.services.vector_storage import init_collection_if_needed, upsert_points, VectorStorageError, get_all_documents, get_document_info
+from app.services.vector_storage import init_collection_if_needed, upsert_points, VectorStorageError, get_all_documents, get_document_info, delete_document
 from qdrant_client.http.models import PointStruct
 from app.config import settings
 
@@ -187,3 +187,20 @@ async def ingest_document(
         collection=settings.QDRANT_COLLECTION,
         chunks=chunks_response
     )
+
+@router.delete("/{document_id}")
+async def delete_indexed_document(document_id: str):
+    try:
+        existing_doc = get_document_info(document_id)
+        if not existing_doc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+        delete_document(document_id)
+
+        return {
+            "document_id": document_id,
+            "deleted": True,
+            "deleted_chunk_count": existing_doc["chunk_count"]
+        }
+    except VectorStorageError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

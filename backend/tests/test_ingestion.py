@@ -116,3 +116,39 @@ def test_ingest_duplicate(mock_upsert, mock_init, mock_embed, mock_get_doc):
     assert not mock_embed.called
     assert not mock_init.called
     assert not mock_upsert.called
+
+
+@patch("app.api.documents.get_document_info")
+@patch("app.api.documents.delete_document")
+def test_delete_document_success(mock_delete, mock_get_doc):
+    mock_get_doc.return_value = {
+        "document_id": "test_id_123",
+        "filename": "test.txt",
+        "file_type": "txt",
+        "chunk_count": 5
+    }
+
+    response = client.delete("/api/documents/test_id_123")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["document_id"] == "test_id_123"
+    assert data["deleted"] is True
+    assert data["deleted_chunk_count"] == 5
+
+    mock_get_doc.assert_called_once_with("test_id_123")
+    mock_delete.assert_called_once_with("test_id_123")
+
+
+@patch("app.api.documents.get_document_info")
+@patch("app.api.documents.delete_document")
+def test_delete_document_not_found(mock_delete, mock_get_doc):
+    mock_get_doc.return_value = None
+
+    response = client.delete("/api/documents/non_existent_id")
+
+    assert response.status_code == 404
+    assert "Document not found" in response.json()["detail"]
+
+    mock_get_doc.assert_called_once_with("non_existent_id")
+    mock_delete.assert_not_called()
