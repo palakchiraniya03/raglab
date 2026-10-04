@@ -10,4 +10,4 @@ venv/
 .DS_Store
 backend/qdrant_data/
 .pytest_cache/
-
+backend/activity_logs/

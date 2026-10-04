@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from app.schemas import RetrievalRequest, RAGResponse, RetrievalResult
 from app.services.retrieval import search_chunks, RetrievalError
 from app.services.generation import generate_text, GenerationError
+from app.services.activity_log import log_activity
 
 router = APIRouter(prefix="/rag", tags=["rag"])
 
@@ -91,6 +92,21 @@ async def ask_question(request: RetrievalRequest):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Unexpected generation error: {str(e)}")
 
     # 6. Return response
+    
+    try:
+        log_activity(
+            event_type="QUERY",
+            document_id=None,
+            details={
+                "query": request.query,
+                "top_k": request.top_k,
+                "selected_source_count": len(sources),
+                "answer_generated": True
+            }
+        )
+    except Exception as e:
+        print(f"Audit log failed: {e}")
+        
     return RAGResponse(
         answer=answer,
         sources=sources

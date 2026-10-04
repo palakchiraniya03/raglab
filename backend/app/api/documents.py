@@ -8,6 +8,7 @@ from app.services.parsing import parse_document, DocumentParsingError
 from app.services.chunking import chunk_text
 from app.services.embeddings import embed_text, EmbeddingError
 from app.services.vector_storage import init_collection_if_needed, upsert_points, VectorStorageError, get_all_documents, get_document_info, delete_document
+from app.services.activity_log import log_activity
 from qdrant_client.http.models import PointStruct
 from app.config import settings
 
@@ -54,6 +55,19 @@ async def ingest_document(
     try:
         existing_doc = get_document_info(document_id)
         if existing_doc:
+            try:
+                log_activity(
+                    event_type="DUPLICATE",
+                    document_id=existing_doc["document_id"],
+                    details={
+                        "filename": existing_doc["filename"],
+                        "file_type": existing_doc["file_type"],
+                        "chunk_count": existing_doc["chunk_count"]
+                    }
+                )
+            except Exception as e:
+                print(f"Audit log failed: {e}")
+                
             return IngestResponse(
                 document_id=existing_doc["document_id"],
                 filename=existing_doc["filename"],
@@ -177,6 +191,19 @@ async def ingest_document(
 
 
 
+    try:
+        log_activity(
+            event_type="INDEX",
+            document_id=document_id,
+            details={
+                "filename": file.filename,
+                "file_type": ext[1:],
+                "chunk_count": len(chunks_response)
+            }
+        )
+    except Exception as e:
+        print(f"Audit log failed: {e}")
+
     return IngestResponse(
         document_id=document_id,
         filename=file.filename,
@@ -196,6 +223,19 @@ async def delete_indexed_document(document_id: str):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
         delete_document(document_id)
+        
+        try:
+            log_activity(
+                event_type="DELETE",
+                document_id=document_id,
+                details={
+                    "filename": existing_doc["filename"],
+                    "file_type": existing_doc["file_type"],
+                    "deleted_chunk_count": existing_doc["chunk_count"]
+                }
+            )
+        except Exception as e:
+            print(f"Audit log failed: {e}")
 
         return {
             "document_id": document_id,
