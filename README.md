@@ -19,11 +19,20 @@ The system consists of three main components:
 - **Vector Database**: Qdrant (local)
 
 ## Current Development Phase
-**Phase 1**: Project Initialization and Architecture Setup
+**Phase 2**: Document Ingestion and Chunking (Current)
+- Support for parsing PDF, TXT, MD, and DOCX files.
+- Configurable character-based chunking.
+  - Default chunk size: 1000 characters
+  - Default chunk overlap: 150 characters
+- Metadata preservation (including page numbers for PDFs).
+- `POST /api/documents/ingest` endpoint implemented for document upload and processing.
+
+**Phase 1**: Project Initialization (Completed)
 - Basic frontend and backend scaffolding
 - API health check
 - Configuration management
 - Minimal frontend connection to backend
+
 
 ## Developer Setup
 
