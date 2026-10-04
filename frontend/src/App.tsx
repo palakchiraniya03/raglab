@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
-  Database, Server, Upload, FileText, CheckCircle, AlertCircle,
-  Search, Loader2, MessageSquare, BookOpen
+  Database, FileText, CheckCircle, AlertCircle,
+  Loader2, Plus, ArrowUp, MessageSquare
 } from 'lucide-react'
 
 interface IngestionResponse {
@@ -27,9 +27,56 @@ interface RetrievalResult {
   }
 }
 
+interface ChatMessage {
+  role: "user" | "assistant"
+  content: string
+  sources?: RetrievalResult[]
+}
+
+interface ChatSession {
+  id: string
+  title: string
+  createdAt: number
+  messages: ChatMessage[]
+}
+
 interface RAGResponse {
   answer: string
   sources: RetrievalResult[]
+}
+
+function SourceCard({ source }: { source: RetrievalResult }) {
+  const [expanded, setExpanded] = useState(false)
+  const isLong = source.text.length > 300
+
+  return (
+    <div className="bg-[#262626] border border-white/5 rounded-xl p-4 flex flex-col gap-3">
+       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500 border-b border-white/5 pb-3">
+          <span className="font-medium text-gray-300 flex items-center gap-1.5">
+            <FileText className="w-3.5 h-3.5" />
+            {source.metadata.filename}
+          </span>
+          {source.metadata.page !== null && <span>Page {source.metadata.page}</span>}
+          <span>Chunk {source.metadata.chunk_index}</span>
+          <span className="text-emerald-500/80 font-medium">Score {source.score.toFixed(3)}</span>
+       </div>
+
+       <div>
+          <div className={`text-gray-400 text-[13.5px] leading-[1.7] whitespace-pre-wrap break-words ${!expanded && isLong ? 'line-clamp-4' : ''}`}>
+             {source.text}
+          </div>
+       </div>
+
+       {isLong && (
+          <button
+             onClick={() => setExpanded(!expanded)}
+             className="text-xs font-medium text-gray-500 hover:text-gray-300 transition-colors self-start mt-1"
+          >
+             {expanded ? "Show less" : "Show more"}
+          </button>
+       )}
+    </div>
+  )
 }
 
 function App() {
@@ -41,12 +88,18 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<IngestionResponse | null>(null)
 
-  // RAG state
+  // Chat state
+  const [sessions, setSessions] = useState<ChatSession[]>([])
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [sessionsLoaded, setSessionsLoaded] = useState(false)
+
   const [question, setQuestion] = useState('')
   const [asking, setAsking] = useState(false)
   const [askError, setAskError] = useState<string | null>(null)
-  const [ragResult, setRagResult] = useState<{ query: string; data: RAGResponse } | null>(null)
 
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Load backend status
   useEffect(() => {
     fetch('http://localhost:8000/api/health')
       .then(res => res.json())
@@ -61,6 +114,39 @@ function App() {
         setBackendStatus('disconnected')
       })
   }, [])
+
+  // Load chat sessions from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('raglab_chat_sessions')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) {
+          setSessions(parsed)
+          if (parsed.length > 0) {
+            setActiveSessionId(parsed[0].id)
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load sessions", err)
+    } finally {
+      setSessionsLoaded(true)
+    }
+  }, [])
+
+  // Save chat sessions to localStorage whenever they change
+  useEffect(() => {
+    if (sessionsLoaded) {
+      localStorage.setItem('raglab_chat_sessions', JSON.stringify(sessions))
+    }
+  }, [sessions, sessionsLoaded])
+
+  // Auto scroll to bottom
+  const activeSession = sessions.find(s => s.id === activeSessionId)
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [activeSession?.messages])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -100,25 +186,51 @@ function App() {
     }
   }
 
+  const generateTitle = (q: string) => q.length > 40 ? q.substring(0, 40) + '...' : q
+
   const handleAsk = async () => {
     if (!question.trim()) return
 
     setAsking(true)
     setAskError(null)
-    setRagResult(null)
 
     const currentQuery = question.trim()
+    setQuestion('')
+
+    let targetSessionId = activeSessionId
+    if (!targetSessionId) {
+      targetSessionId = Date.now().toString()
+      setActiveSessionId(targetSessionId)
+    }
+    const finalSessionId = targetSessionId
+
+    setSessions(prev => {
+      const idx = prev.findIndex(s => s.id === finalSessionId)
+      if (idx === -1) {
+        const newSession: ChatSession = {
+          id: finalSessionId,
+          title: generateTitle(currentQuery),
+          createdAt: Date.now(),
+          messages: [{ role: "user", content: currentQuery }]
+        }
+        return [newSession, ...prev]
+      } else {
+        const newSessions = [...prev]
+        const updatedSession = { ...newSessions[idx] }
+        if (updatedSession.messages.length === 0) {
+          updatedSession.title = generateTitle(currentQuery)
+        }
+        updatedSession.messages = [...updatedSession.messages, { role: "user", content: currentQuery }]
+        newSessions[idx] = updatedSession
+        return newSessions
+      }
+    })
 
     try {
       const res = await fetch('http://localhost:8000/api/rag/ask', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          query: currentQuery,
-          top_k: 5
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: currentQuery, top_k: 5 })
       })
 
       if (!res.ok) {
@@ -127,8 +239,20 @@ function App() {
       }
 
       const data: RAGResponse = await res.json()
-      setRagResult({ query: currentQuery, data })
-      setQuestion('')
+
+      setSessions(prev => {
+        const newSessions = [...prev]
+        const idx = newSessions.findIndex(s => s.id === finalSessionId)
+        if (idx !== -1) {
+          const updatedSession = { ...newSessions[idx] }
+          updatedSession.messages = [
+            ...updatedSession.messages,
+            { role: "assistant", content: data.answer, sources: data.sources }
+          ]
+          newSessions[idx] = updatedSession
+        }
+        return newSessions
+      })
     } catch (err: any) {
       setAskError(err.message || 'An unexpected error occurred.')
     } finally {
@@ -136,208 +260,258 @@ function App() {
     }
   }
 
+  const hasMessages = activeSession && activeSession.messages.length > 0
+
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center p-8">
+    <div className="flex h-screen bg-[#212121] text-gray-100 font-sans overflow-hidden selection:bg-white/20">
 
-      {/* Header */}
-      <div className="flex items-center justify-center mb-8">
-        <Database className="w-10 h-10 text-blue-500 mr-4" />
-        <h1 className="text-4xl font-bold text-white tracking-tight">RAGLab</h1>
-      </div>
+      {/* DESKTOP SIDEBAR */}
+      <aside className="w-[260px] bg-[#171717] flex-col shrink-0 md:flex hidden relative">
+        <div className="p-4 flex flex-col h-full">
 
-      <div className="max-w-3xl w-full space-y-6">
+           {/* Logo / Header */}
+           <div className="flex items-center gap-3 mb-6 px-2">
+             <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0">
+               <Database className="w-5 h-5 text-black" />
+             </div>
+             <div className="flex flex-col">
+               <span className="font-semibold text-[15px] text-gray-100 tracking-tight">RAGLab</span>
+               <span className="text-xs text-gray-400">Offline RAG Workbench</span>
+             </div>
+           </div>
 
-        {/* Status Section */}
-        <div className="bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700 flex gap-4">
-          <div className="flex-1 flex items-center justify-between p-4 bg-gray-700/50 rounded-lg">
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-green-500 rounded-full mr-3 animate-pulse"></div>
-              <span className="font-medium">Frontend</span>
-            </div>
-            <span className="text-sm text-green-400">Running</span>
-          </div>
+           {/* New Chat Action */}
+           <button
+             onClick={() => setActiveSessionId(null)}
+             className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-white/10 hover:bg-white/5 transition-colors cursor-pointer mb-6 group w-full"
+           >
+              <Plus className="w-4 h-4 text-gray-300" />
+              <span className="text-[14px] font-medium text-gray-200">New chat</span>
+           </button>
 
-          <div className="flex-1 flex items-center justify-between p-4 bg-gray-700/50 rounded-lg">
-            <div className="flex items-center">
-              <Server className="w-5 h-5 text-gray-400 mr-3" />
-              <span className="font-medium">Backend API</span>
-            </div>
-            <span className={`text-sm ${
-              backendStatus === 'connected' ? 'text-green-400' :
-              backendStatus === 'checking...' ? 'text-yellow-400' : 'text-red-400'
-            }`}>
-              {backendStatus}
-            </span>
-          </div>
-        </div>
+           {/* Chats List */}
+           <div className="flex-1 overflow-y-auto min-h-0 mb-4">
+             <div className="px-2 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Recent</div>
+             {sessions.length === 0 ? (
+               <div className="px-3 text-[13px] text-gray-500">No conversations yet</div>
+             ) : (
+               <div className="flex flex-col gap-1">
+                 {sessions.map(s => (
+                   <button
+                     key={s.id}
+                     onClick={() => setActiveSessionId(s.id)}
+                     className={`flex items-center w-full px-3 py-2 rounded-lg text-left text-[13px] transition-colors ${activeSessionId === s.id ? 'bg-[#2f2f2f] text-gray-200' : 'text-gray-400 hover:bg-[#212121]'}`}
+                   >
+                     <MessageSquare className={`w-3.5 h-3.5 mr-2 shrink-0 ${activeSessionId === s.id ? 'text-gray-300' : 'text-gray-500'}`} />
+                     <span className="truncate">{s.title}</span>
+                   </button>
+                 ))}
+               </div>
+             )}
+           </div>
 
-        {/* Upload Section */}
-        <div className="bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
-          <h2 className="text-xl font-semibold mb-4 flex items-center">
-            <Upload className="w-5 h-5 mr-2 text-blue-400" />
-            Document Ingestion
-          </h2>
+           {/* Knowledge Base */}
+           <div className="shrink-0 border-t border-white/5 pt-4 mb-2">
+             <div className="px-2 mb-3 text-xs font-semibold text-gray-500 uppercase tracking-wider flex justify-between items-center">
+                Knowledge Base
+                <label className="cursor-pointer text-gray-400 hover:text-gray-200 transition-colors" title="Add document">
+                   <Plus className="w-3.5 h-3.5" />
+                   <input type="file" className="hidden" accept=".pdf,.txt,.md,.docx" onChange={handleFileChange} />
+                </label>
+             </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-center w-full">
-              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-600 border-dashed rounded-lg cursor-pointer bg-gray-700/30 hover:bg-gray-700/50 transition-colors">
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <FileText className="w-8 h-8 text-gray-400 mb-2" />
-                  <p className="mb-2 text-sm text-gray-300">
-                    <span className="font-semibold">Click to select a file</span>
-                  </p>
-                  <p className="text-xs text-gray-500">PDF, TXT, MD, DOCX</p>
+             {/* Uploading Status */}
+             {file && !uploading && !result && (
+                <div className="px-3 py-3 rounded-lg bg-[#212121] border border-white/10 mb-2 flex flex-col gap-3">
+                   <div className="flex items-center gap-2 overflow-hidden">
+                      <FileText className="w-4 h-4 text-gray-400 shrink-0" />
+                      <span className="text-[13px] text-gray-200 truncate">{file.name}</span>
+                   </div>
+                   <button
+                      onClick={handleUpload}
+                      className="w-full py-1.5 bg-white text-black text-[13px] font-medium rounded hover:bg-gray-200 transition-colors"
+                    >
+                      Upload & Index
+                    </button>
                 </div>
-                <input
-                  type="file"
-                  className="hidden"
-                  accept=".pdf,.txt,.md,.docx"
-                  onChange={handleFileChange}
-                />
-              </label>
-            </div>
+             )}
 
-            {file && (
-              <div className="flex items-center justify-between bg-gray-700 p-3 rounded-md">
-                <span className="text-sm text-gray-200 truncate pr-4">{file.name}</span>
-                <button
-                  onClick={handleUpload}
-                  disabled={uploading}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:text-gray-400 text-white text-sm font-medium rounded-md transition-colors whitespace-nowrap"
-                >
-                  {uploading ? 'Uploading...' : 'Upload & Index'}
-                </button>
-              </div>
-            )}
+             {uploading && (
+               <div className="px-3 py-3 rounded-lg bg-[#212121] border border-white/10 mb-2 flex items-center gap-3">
+                  <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                  <span className="text-[13px] text-gray-300">Indexing...</span>
+               </div>
+             )}
 
-            {error && (
-              <div className="flex items-center p-3 mt-4 text-sm text-red-400 bg-red-900/30 rounded-lg border border-red-800">
-                <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
-                {error}
-              </div>
-            )}
-          </div>
-        </div>
+             {error && (
+               <div className="px-3 py-3 rounded-lg bg-red-900/20 border border-red-900/30 mb-2 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                  <span className="text-[13px] text-red-400 leading-tight">{error}</span>
+               </div>
+             )}
 
-        {/* Result Section */}
-        {result && (
-          <div className="bg-gray-800 rounded-xl shadow-lg p-6 border border-green-700/50">
-            <h2 className="text-xl font-semibold mb-4 flex items-center text-green-400">
-              <CheckCircle className="w-5 h-5 mr-2" />
-              Ingestion Successful
-            </h2>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-gray-700/50 p-4 rounded-lg border border-gray-700">
-                <p className="text-sm text-gray-400 mb-1">Filename</p>
-                <p className="font-medium text-gray-100 truncate" title={result.filename}>{result.filename}</p>
-              </div>
-              <div className="bg-gray-700/50 p-4 rounded-lg border border-gray-700">
-                <p className="text-sm text-gray-400 mb-1">File Type</p>
-                <p className="font-medium text-gray-100 uppercase">{result.file_type}</p>
-              </div>
-              <div className="bg-gray-700/50 p-4 rounded-lg border border-gray-700">
-                <p className="text-sm text-gray-400 mb-1">Total Characters</p>
-                <p className="font-medium text-gray-100">{result.total_characters.toLocaleString()}</p>
-              </div>
-              <div className="bg-gray-700/50 p-4 rounded-lg border border-gray-700">
-                <p className="text-sm text-gray-400 mb-1">Collection</p>
-                <p className="font-medium text-gray-100">{result.collection}</p>
-              </div>
-              <div className="bg-gray-700/50 p-4 rounded-lg border border-gray-700">
-                <p className="text-sm text-gray-400 mb-1">Total Chunks</p>
-                <p className="font-medium text-gray-100">{result.total_chunks}</p>
-              </div>
-              <div className="bg-gray-700/50 p-4 rounded-lg border border-gray-700">
-                <p className="text-sm text-gray-400 mb-1">Embedded Chunks</p>
-                <p className="font-medium text-green-400">{result.embedded_chunks}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* RAG Ask Section */}
-        <div className="bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
-          <h2 className="text-xl font-semibold mb-4 flex items-center">
-            <Search className="w-5 h-5 mr-2 text-blue-400" />
-            Ask your documents
-          </h2>
-
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Ask a question about your documents..."
-                className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500 placeholder-gray-400"
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleAsk() }}
-              />
-              <button
-                onClick={handleAsk}
-                disabled={asking || !question.trim()}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:text-gray-400 text-white font-medium rounded-lg transition-colors whitespace-nowrap flex items-center"
-              >
-                {asking ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Thinking...
-                  </>
-                ) : (
-                  'Ask'
-                )}
-              </button>
-            </div>
-
-            {askError && (
-              <div className="flex items-center p-3 text-sm text-red-400 bg-red-900/30 rounded-lg border border-red-800">
-                <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
-                {askError}
-              </div>
-            )}
-
-            {ragResult && (
-              <div className="mt-6 space-y-4 border-t border-gray-700 pt-6">
-                <div className="bg-gray-700/50 rounded-lg p-4">
-                  <p className="text-sm text-gray-400 mb-1">Question</p>
-                  <p className="text-white font-medium">{ragResult.query}</p>
-                </div>
-
-                <div className="bg-gray-700/50 rounded-lg p-4 border border-blue-500/30">
-                  <p className="text-sm text-blue-400 mb-2 flex items-center">
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    Answer
-                  </p>
-                  <div className="text-white whitespace-pre-wrap">{ragResult.data.answer}</div>
-                </div>
-
-                {ragResult.data.sources && ragResult.data.sources.length > 0 && (
-                  <div>
-                    <p className="text-sm text-gray-400 mb-3 flex items-center">
-                      <BookOpen className="w-4 h-4 mr-2" />
-                      Sources
-                    </p>
-                    <div className="space-y-3">
-                      {ragResult.data.sources.map((source, idx) => (
-                        <div key={idx} className="bg-gray-700/30 rounded-lg p-4 border border-gray-700 text-sm">
-                          <div className="flex flex-wrap gap-x-4 gap-y-2 mb-2 text-gray-400">
-                            <span className="flex items-center"><FileText className="w-3 h-3 mr-1"/> {source.metadata.filename}</span>
-                            {source.metadata.page !== null && <span>Page: {source.metadata.page}</span>}
-                            <span>Chunk: {source.metadata.chunk_index}</span>
-                            <span>Score: {source.score.toFixed(3)}</span>
-                          </div>
-                          <p className="text-gray-300 italic">"{source.text}"</p>
-                        </div>
-                      ))}
-                    </div>
+             {result ? (
+               <div className="px-3 py-2.5 rounded-lg hover:bg-[#212121] transition-colors cursor-default group flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2">
+                     <FileText className="w-4 h-4 text-gray-400 shrink-0" />
+                     <span className="text-[14px] text-gray-200 truncate" title={result.filename}>{result.filename}</span>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+                  <div className="flex items-center gap-3 text-xs text-gray-500 pl-6">
+                     <span className="uppercase">{result.file_type}</span>
+                     <span className="flex items-center gap-1"><CheckCircle className="w-3 h-3 text-emerald-500/80"/> {result.embedded_chunks}/{result.total_chunks}</span>
+                  </div>
+               </div>
+             ) : (!file && !uploading && (
+               <div className="px-3 text-[13px] text-gray-500">No documents indexed</div>
+             ))}
+           </div>
 
+           {/* Footer: Status */}
+           <div className="pt-4 border-t border-white/5 flex items-center gap-2 px-2 text-[13px]">
+             {backendStatus === 'connected' ? (
+                <div className="flex items-center gap-2 text-gray-400">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                  Backend connected
+                </div>
+              ) : backendStatus === 'checking...' ? (
+                <div className="flex items-center gap-2 text-gray-500">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                  Checking status
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-gray-500">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  Backend offline
+                </div>
+              )}
+           </div>
+        </div>
+      </aside>
+
+      {/* MOBILE HEADER */}
+      <div className="md:hidden flex items-center justify-between p-4 bg-[#212121] absolute top-0 w-full z-10 border-b border-white/5">
+         <div className="font-semibold text-gray-200">RAGLab</div>
+         <button onClick={() => setActiveSessionId(null)} className="text-gray-300">
+           <Plus className="w-5 h-5" />
+         </button>
       </div>
+
+      {/* MAIN WORKSPACE */}
+      <main className="flex-1 flex flex-col min-w-0 bg-[#212121] relative h-full">
+
+         <div className="flex-1 overflow-y-auto">
+            <div className="max-w-3xl mx-auto pt-20 md:pt-10 pb-40 px-4 md:px-6">
+
+               {/* Empty State */}
+               {!hasMessages && !asking && (
+                 <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+                    <div className="w-12 h-12 bg-white flex items-center justify-center rounded-full mb-6">
+                       <Database className="w-6 h-6 text-black" />
+                    </div>
+                    <h2 className="text-2xl font-semibold text-gray-200 mb-2">Ask your documents</h2>
+                    <p className="text-[15px] text-gray-400">Upload a document and ask questions grounded in its contents.</p>
+                 </div>
+               )}
+
+               {/* Active Conversation */}
+               {hasMessages && (
+                 <div className="flex flex-col gap-8 animate-in fade-in duration-500">
+                    {activeSession!.messages.map((msg, msgIdx) => {
+                       if (msg.role === 'user') {
+                          return (
+                            <div key={msgIdx} className="flex justify-end mt-4">
+                               <div className="bg-[#2f2f2f] px-5 py-3.5 rounded-3xl max-w-[85%] text-[15px] text-gray-100 whitespace-pre-wrap">
+                                  {msg.content}
+                               </div>
+                            </div>
+                          )
+                       } else {
+                          return (
+                            <div key={msgIdx} className="flex gap-4">
+                               <div className="w-8 h-8 rounded-full bg-white flex flex-shrink-0 items-center justify-center mt-1">
+                                  <Database className="w-5 h-5 text-black" />
+                               </div>
+                               <div className="flex flex-col min-w-0 w-full">
+
+                                  {/* Answer Text */}
+                                  <div className="text-[16px] text-gray-200 leading-relaxed whitespace-pre-wrap">
+                                     {msg.content}
+                                  </div>
+
+                                  {/* Sources Block */}
+                                  {msg.sources && msg.sources.length > 0 && (
+                                     <div className="mt-6 border-t border-white/5 pt-5">
+                                        <div className="text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-4">Sources</div>
+                                        <div className="flex flex-col gap-3">
+                                            {msg.sources.map((source, idx) => (
+                                               <SourceCard key={idx} source={source} />
+                                            ))}
+                                        </div>
+                                     </div>
+                                  )}
+                               </div>
+                            </div>
+                          )
+                       }
+                    })}
+                    {asking && (
+                       <div className="flex gap-4">
+                          <div className="w-8 h-8 rounded-full bg-white flex flex-shrink-0 items-center justify-center mt-1">
+                             <Database className="w-5 h-5 text-black" />
+                          </div>
+                          <div className="flex items-center text-gray-400">
+                             <Loader2 className="w-5 h-5 animate-spin" />
+                          </div>
+                       </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                 </div>
+               )}
+            </div>
+         </div>
+
+         {/* COMPOSER AT BOTTOM */}
+         <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-[#212121] via-[#212121] to-transparent pt-10 pb-6 px-4 md:px-6">
+            <div className="max-w-3xl mx-auto relative">
+
+               {askError && (
+                 <div className="mb-3 px-4 py-3 bg-red-900/20 border border-red-900/30 rounded-lg text-[13px] text-red-400 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{askError}</span>
+                 </div>
+               )}
+
+               <div className="relative flex items-end bg-[#2f2f2f] rounded-[24px] focus-within:ring-1 ring-gray-400 shadow-md">
+                  <input
+                    type="text"
+                    placeholder={result ? "Ask something about your documents..." : "Upload a document to ask questions..."}
+                    className="w-full bg-transparent text-[15px] text-gray-100 placeholder-gray-400 px-5 py-4 pr-14 focus:outline-none rounded-[24px]"
+                    value={question}
+                    disabled={!result || asking}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleAsk()
+                      }
+                    }}
+                  />
+                  <div className="absolute right-2.5 bottom-2.5">
+                     <button
+                       onClick={handleAsk}
+                       disabled={asking || !question.trim() || !result}
+                       className="w-9 h-9 rounded-full bg-white text-black hover:bg-gray-200 disabled:bg-[#404040] disabled:text-gray-500 transition-colors flex items-center justify-center"
+                     >
+                       {asking ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}
+                     </button>
+                  </div>
+               </div>
+               <div className="text-center mt-3 text-[11px] text-gray-500">
+                  RAGLab can make mistakes. Verify important information with the sources.
+               </div>
+            </div>
+         </div>
+      </main>
     </div>
   )
 }
