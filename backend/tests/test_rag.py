@@ -38,24 +38,24 @@ def test_rag_success(mock_search_chunks, mock_generate_text):
             }
         }
     ]
-    
+
     mock_generate_text.return_value = "The Laplacian matrix is L = D - A and it relates to graph connectivity."
-    
+
     response = client.post(
         "/api/rag/ask",
         json={"query": "What is the Laplacian matrix?", "top_k": 2}
     )
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     assert data["answer"] == "The Laplacian matrix is L = D - A and it relates to graph connectivity."
     assert len(data["sources"]) == 2
     assert data["sources"][0]["text"] == "The Laplacian matrix is L = D - A."
-    
+
     mock_search_chunks.assert_called_once_with(query="What is the Laplacian matrix?", top_k=2)
     mock_generate_text.assert_called_once()
-    
+
     # Verify prompt construction
     prompt = mock_generate_text.call_args[1]["prompt"]
     assert "[Source 1]" in prompt
@@ -72,18 +72,18 @@ def test_rag_success(mock_search_chunks, mock_generate_text):
 @patch("app.api.rag.search_chunks", new_callable=AsyncMock)
 def test_rag_no_context(mock_search_chunks, mock_generate_text):
     mock_search_chunks.return_value = []
-    
+
     response = client.post(
         "/api/rag/ask",
         json={"query": "What is the meaning of life?"}
     )
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     assert "could not find any relevant information" in data["answer"].lower()
     assert len(data["sources"]) == 0
-    
+
     mock_search_chunks.assert_called_once()
     mock_generate_text.assert_not_called()
 
@@ -91,12 +91,12 @@ def test_rag_no_context(mock_search_chunks, mock_generate_text):
 @patch("app.api.rag.search_chunks", new_callable=AsyncMock)
 def test_rag_retrieval_failure(mock_search_chunks):
     mock_search_chunks.side_effect = RetrievalError("Database connection lost")
-    
+
     response = client.post(
         "/api/rag/ask",
         json={"query": "test"}
     )
-    
+
     assert response.status_code == 500
     assert "Retrieval failed" in response.json()["detail"]
 
@@ -115,12 +115,12 @@ def test_rag_generation_failure(mock_search_chunks, mock_generate_text):
         }
     ]
     mock_generate_text.side_effect = GenerationError("Ollama timeout")
-    
+
     response = client.post(
         "/api/rag/ask",
         json={"query": "test"}
     )
-    
+
     assert response.status_code == 502
     assert "Generation failed" in response.json()["detail"]
 
@@ -146,26 +146,26 @@ def test_rag_max_context_chunks(mock_search_chunks, mock_generate_text):
         {"text": f"Chunk {i}", "score": 0.9, "metadata": {"document_id": "1", "filename": "1.txt", "file_type": "txt", "page": None, "chunk_index": i, "char_start": 0, "char_end": 10}}
         for i in range(5)
     ]
-    
+
     mock_generate_text.return_value = "Mocked answer"
-    
+
     response = client.post(
         "/api/rag/ask",
         json={"query": "test query", "top_k": 5}
     )
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     from app.config import settings
     # The API should limit to RAG_MAX_CONTEXT_CHUNKS (which defaults to 3)
     expected_limit = settings.RAG_MAX_CONTEXT_CHUNKS
-    
+
     assert len(data["sources"]) == expected_limit
     assert data["sources"][0]["text"] == "Chunk 0"
     assert data["sources"][1]["text"] == "Chunk 1"
     assert data["sources"][2]["text"] == "Chunk 2"
-    
+
     prompt = mock_generate_text.call_args[1]["prompt"]
     assert "Chunk 0" in prompt
     assert "Chunk 1" in prompt
@@ -181,14 +181,48 @@ def test_rag_fewer_than_max_chunks(mock_search_chunks, mock_generate_text):
         {"text": f"Chunk {i}", "score": 0.9, "metadata": {"document_id": "1", "filename": "1.txt", "file_type": "txt", "page": None, "chunk_index": i, "char_start": 0, "char_end": 10}}
         for i in range(2)
     ]
-    
+
     mock_generate_text.return_value = "Mocked answer"
-    
+
     response = client.post(
         "/api/rag/ask",
         json={"query": "test query", "top_k": 5}
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     assert len(data["sources"]) == 2
+
+@patch("app.api.rag.generate_text", new_callable=AsyncMock)
+@patch("app.api.rag.search_chunks", new_callable=AsyncMock)
+def test_rag_fiedler_diagnostics(mock_search_chunks, mock_generate_text):
+    mock_search_chunks.return_value = [
+        {
+            "text": "The Fiedler value is...",
+            "score": 0.52,
+            "semantic_score": 0.45,
+            "lexical_boost": 0.07,
+            "final_score": 0.52,
+            "selected": True,
+            "metadata": {
+                "document_id": "1", "filename": "1.txt", "file_type": "txt",
+                "page": None, "chunk_index": 0, "char_start": 0, "char_end": 10
+            }
+        }
+    ]
+
+    mock_generate_text.return_value = "Mocked answer"
+
+    response = client.post(
+        "/api/rag/ask",
+        json={"query": "What is the Fiedler value?", "top_k": 5}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["sources"]) == 1
+
+    source = data["sources"][0]
+    assert abs(source["semantic_score"] - 0.45) < 1e-6
+    assert abs(source["lexical_boost"] - 0.07) < 1e-6
+    assert abs(source["final_score"] - 0.52) < 1e-6

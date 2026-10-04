@@ -1,7 +1,7 @@
 import os
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams, PointStruct
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from app.config import settings
 
@@ -27,7 +27,7 @@ def init_collection_if_needed(dimension: int) -> None:
         # Check if collection exists
         collections_response = client.get_collections()
         exists = any(c.name == collection_name for c in collections_response.collections)
-        
+
         if exists:
             # Check dimension matches
             collection_info = client.get_collection(collection_name)
@@ -73,3 +73,83 @@ def search_vectors(query_vector: List[float], top_k: int = 5) -> List[Dict[str, 
         return results
     except Exception as e:
         raise VectorStorageError(f"Failed to search vectors: {str(e)}")
+
+from qdrant_client.http.models import Filter, FieldCondition, MatchValue
+
+def get_all_documents() -> List[Dict[str, Any]]:
+    """Get unique documents from Qdrant via scroll."""
+    try:
+        collections = client.get_collections().collections
+        if not any(c.name == settings.QDRANT_COLLECTION for c in collections):
+            return []
+
+        documents = {}
+        offset = None
+        while True:
+            records, next_page_offset = client.scroll(
+                collection_name=settings.QDRANT_COLLECTION,
+                limit=1000,
+                offset=offset,
+                with_payload=["document_id", "filename", "file_type"],
+                with_vectors=False
+            )
+            for record in records:
+                payload = record.payload or {}
+                doc_id = payload.get("document_id")
+                if not doc_id:
+                    continue
+                if doc_id not in documents:
+                    documents[doc_id] = {
+                        "document_id": doc_id,
+                        "filename": payload.get("filename", "Unknown"),
+                        "file_type": payload.get("file_type", "Unknown"),
+                        "chunk_count": 0
+                    }
+                documents[doc_id]["chunk_count"] += 1
+
+            if next_page_offset is None:
+                break
+            offset = next_page_offset
+
+        return list(documents.values())
+    except Exception as e:
+        raise VectorStorageError(f"Failed to get all documents: {str(e)}")
+
+def get_document_info(document_id: str) -> Optional[Dict[str, Any]]:
+    """Check if a document exists and return its metadata and chunk count."""
+    try:
+        collections = client.get_collections().collections
+        if not any(c.name == settings.QDRANT_COLLECTION for c in collections):
+            return None
+
+        count_result = client.count(
+            collection_name=settings.QDRANT_COLLECTION,
+            count_filter=Filter(
+                must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))]
+            ),
+            exact=True
+        )
+        if count_result.count == 0:
+            return None
+
+        records, _ = client.scroll(
+            collection_name=settings.QDRANT_COLLECTION,
+            scroll_filter=Filter(
+                must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))]
+            ),
+            limit=1,
+            with_payload=["filename", "file_type"],
+            with_vectors=False
+        )
+        if not records:
+            return None
+
+        payload = records[0].payload or {}
+        return {
+            "document_id": document_id,
+            "filename": payload.get("filename", "Unknown"),
+            "file_type": payload.get("file_type", "Unknown"),
+            "chunk_count": count_result.count
+        }
+    except Exception as e:
+        raise VectorStorageError(f"Failed to get document info: {str(e)}")

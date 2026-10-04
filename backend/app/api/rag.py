@@ -28,6 +28,10 @@ async def ask_question(request: RetrievalRequest):
             RetrievalResult(
                 text=chunk["text"],
                 score=chunk["score"],
+                semantic_score=chunk.get("semantic_score"),
+                lexical_boost=chunk.get("lexical_boost"),
+                final_score=chunk.get("final_score"),
+                selected=chunk.get("selected"),
                 metadata=chunk["metadata"]
             )
         )

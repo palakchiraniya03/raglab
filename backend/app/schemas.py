@@ -14,6 +14,12 @@ class ChunkResponse(BaseModel):
     text: str
     metadata: ChunkMetadata
 
+class DocumentItem(BaseModel):
+    document_id: str
+    filename: str
+    file_type: str
+    chunk_count: int
+
 class IngestResponse(BaseModel):
     document_id: str
     filename: str
@@ -22,7 +28,8 @@ class IngestResponse(BaseModel):
     total_chunks: int
     embedded_chunks: int
     collection: str
-    chunks: List[ChunkResponse]
+    chunks: List[ChunkResponse] = []
+    already_indexed: bool = False
 
 class RetrievalRequest(BaseModel):
     query: str
@@ -31,6 +38,10 @@ class RetrievalRequest(BaseModel):
 class RetrievalResult(BaseModel):
     text: str
     score: float
+    semantic_score: Optional[float] = None
+    lexical_boost: Optional[float] = None
+    final_score: Optional[float] = None
+    selected: Optional[bool] = None
     metadata: dict
 
 class RetrievalResponse(BaseModel):
