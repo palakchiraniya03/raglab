@@ -13,7 +13,8 @@ class Settings(BaseSettings):
 
     # Phase 4 Configuration
     GENERATION_MODEL: str = "gemma3:1b"
-    RETRIEVAL_SCORE_THRESHOLD: float = 0.45
+    RETRIEVAL_SCORE_THRESHOLD: float = 0.50
+    RAG_MAX_CONTEXT_CHUNKS: int = 3
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

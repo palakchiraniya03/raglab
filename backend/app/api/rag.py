@@ -31,6 +31,10 @@ async def ask_question(request: RetrievalRequest):
                 metadata=chunk["metadata"]
             )
         )
+        
+    # Limit context chunks
+    from app.config import settings
+    sources = sources[:settings.RAG_MAX_CONTEXT_CHUNKS]
 
     # 2. Check if context is found
     if not sources:

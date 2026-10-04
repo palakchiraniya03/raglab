@@ -135,3 +135,58 @@ def test_rag_invalid_top_k():
         json={"query": "valid query", "top_k": 0}
     )
     assert response.status_code == 400
+
+@patch("app.api.rag.generate_text", new_callable=AsyncMock)
+@patch("app.api.rag.search_chunks", new_callable=AsyncMock)
+def test_rag_max_context_chunks(mock_search_chunks, mock_generate_text):
+    # Mock returning 5 relevant chunks
+    mock_search_chunks.return_value = [
+        {"text": f"Chunk {i}", "score": 0.9, "metadata": {"document_id": "1", "filename": "1.txt", "file_type": "txt", "page": None, "chunk_index": i, "char_start": 0, "char_end": 10}}
+        for i in range(5)
+    ]
+    
+    mock_generate_text.return_value = "Mocked answer"
+    
+    response = client.post(
+        "/api/rag/ask",
+        json={"query": "test query", "top_k": 5}
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    from app.config import settings
+    # The API should limit to RAG_MAX_CONTEXT_CHUNKS (which defaults to 3)
+    expected_limit = settings.RAG_MAX_CONTEXT_CHUNKS
+    
+    assert len(data["sources"]) == expected_limit
+    assert data["sources"][0]["text"] == "Chunk 0"
+    assert data["sources"][1]["text"] == "Chunk 1"
+    assert data["sources"][2]["text"] == "Chunk 2"
+    
+    prompt = mock_generate_text.call_args[1]["prompt"]
+    assert "Chunk 0" in prompt
+    assert "Chunk 1" in prompt
+    assert "Chunk 2" in prompt
+    assert "Chunk 3" not in prompt
+    assert "Chunk 4" not in prompt
+
+@patch("app.api.rag.generate_text", new_callable=AsyncMock)
+@patch("app.api.rag.search_chunks", new_callable=AsyncMock)
+def test_rag_fewer_than_max_chunks(mock_search_chunks, mock_generate_text):
+    # Mock returning 2 chunks (less than max 3)
+    mock_search_chunks.return_value = [
+        {"text": f"Chunk {i}", "score": 0.9, "metadata": {"document_id": "1", "filename": "1.txt", "file_type": "txt", "page": None, "chunk_index": i, "char_start": 0, "char_end": 10}}
+        for i in range(2)
+    ]
+    
+    mock_generate_text.return_value = "Mocked answer"
+    
+    response = client.post(
+        "/api/rag/ask",
+        json={"query": "test query", "top_k": 5}
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["sources"]) == 2
