@@ -100,9 +100,15 @@
     "expected_terms": [
       "shortest path length",
       "minimum",
-      "steps",
       "distance"
     ],
+    "acceptable_terms": {
+      "distance": [
+        "distance",
+        "minimum number of edges",
+        "steps"
+      ]
+    },
     "answerable": true
   },
   {

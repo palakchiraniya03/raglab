@@ -49,8 +49,11 @@ def test_rag_success(mock_search_chunks, mock_generate_text):
     assert response.status_code == 200
     data = response.json()
 
+    from app.config import settings
+    expected_count = min(2, settings.RAG_MAX_CONTEXT_CHUNKS)
+
     assert data["answer"] == "The Laplacian matrix is L = D - A and it relates to graph connectivity."
-    assert len(data["sources"]) == 2
+    assert len(data["sources"]) == expected_count
     assert data["sources"][0]["text"] == "The Laplacian matrix is L = D - A."
 
     mock_search_chunks.assert_called_once_with(query="What is the Laplacian matrix?", top_k=2)
@@ -60,11 +63,12 @@ def test_rag_success(mock_search_chunks, mock_generate_text):
     prompt = mock_generate_text.call_args[1]["prompt"]
     assert "[Source 1]" in prompt
     assert "math.txt" in prompt
-    assert "[Source 2]" in prompt
-    assert "graph.pdf" in prompt
-    assert "Page: 2" in prompt
+    if expected_count > 1:
+        assert "[Source 2]" in prompt
+        assert "graph.pdf" in prompt
+        assert "Page: 2" in prompt
     assert "What is the Laplacian matrix?" in prompt
-    assert "using only the information in the context" in prompt
+    assert "using the provided document context" in prompt
 
 
 
@@ -164,15 +168,16 @@ def test_rag_max_context_chunks(mock_search_chunks, mock_generate_text):
 
     assert len(data["sources"]) == expected_limit
     assert data["sources"][0]["text"] == "Chunk 0"
-    assert data["sources"][1]["text"] == "Chunk 1"
-    assert data["sources"][2]["text"] == "Chunk 2"
+    if expected_limit > 1:
+        assert data["sources"][1]["text"] == "Chunk 1"
+    if expected_limit > 2:
+        assert data["sources"][2]["text"] == "Chunk 2"
 
     prompt = mock_generate_text.call_args[1]["prompt"]
-    assert "Chunk 0" in prompt
-    assert "Chunk 1" in prompt
-    assert "Chunk 2" in prompt
-    assert "Chunk 3" not in prompt
-    assert "Chunk 4" not in prompt
+    for i in range(expected_limit):
+        assert f"Chunk {i}" in prompt
+    for i in range(expected_limit, 5):
+        assert f"Chunk {i}" not in prompt
 
 @patch("app.api.rag.generate_text", new_callable=AsyncMock)
 @patch("app.api.rag.search_chunks", new_callable=AsyncMock)
@@ -192,7 +197,8 @@ def test_rag_fewer_than_max_chunks(mock_search_chunks, mock_generate_text):
 
     assert response.status_code == 200
     data = response.json()
-    assert len(data["sources"]) == 2
+    from app.config import settings
+    assert len(data["sources"]) == min(2, settings.RAG_MAX_CONTEXT_CHUNKS)
 
 @patch("app.api.rag.generate_text", new_callable=AsyncMock)
 @patch("app.api.rag.search_chunks", new_callable=AsyncMock)

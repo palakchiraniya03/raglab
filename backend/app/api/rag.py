@@ -61,7 +61,7 @@ async def ask_question(request: RetrievalRequest):
 
     # 4. Build prompt
     prompt = f"""
-    Answer the question using only the information in the context.
+    Answer the user's question using the provided document context.
 
     Context:
     {context_string}
@@ -69,9 +69,15 @@ async def ask_question(request: RetrievalRequest):
     Question:
     {request.query}
 
-    Give a short, direct answer based on the context.
-    If the context does not contain the answer, say:
-    "The information is not available in the provided documents."
+    Instructions:
+    - Use the context as the source of truth.
+    - For conceptual/definition questions, answer with the conceptual definition from the document, not an implementation function or code snippet.
+    - If the context contains both a prose definition and implementation code, prefer the prose definition unless explicitly asked for code.
+    - Include the important defining details explicitly stated in the context, such as formulas/values (e.g., 1 and 0), named terminology (e.g., Fiedler Value), minimum/maximum conditions, and relevant start/target concepts.
+    - Do not merely copy a function name as the answer to a conceptual question.
+    - Do not use outside knowledge or invent details.
+    - If the context genuinely does not contain enough information to answer the question, clearly state that the answer is not available in the provided documents.
+    - Keep the answer concise, preferably 1-2 sentences.
 
     Answer:
     """

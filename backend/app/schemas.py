@@ -57,3 +57,32 @@ class GenerationResponse(BaseModel):
 class RAGResponse(BaseModel):
     answer: str
     sources: List[RetrievalResult]
+
+
+class EvaluationCaseResult(BaseModel):
+    id: str
+    question: str
+    answerable: bool
+    answer: str
+    expected_terms: List[str]
+    missing_answer_terms: List[str]
+    missing_source_terms: List[str]
+    sources_count: int
+    has_sources: bool
+    answer_passed: bool
+    sources_passed: bool
+    latency: float
+    diagnosis: str
+
+class EvaluationSummary(BaseModel):
+    total_questions: int
+    answerable_questions: int
+    unanswerable_questions: int
+    retrieval_success_count: int
+    answer_term_pass_count: int
+    refusal_success_count: int
+    average_latency: float
+
+class EvaluationResponse(BaseModel):
+    summary: EvaluationSummary
+    results: List[EvaluationCaseResult]

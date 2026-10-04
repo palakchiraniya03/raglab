@@ -24,6 +24,7 @@ async def test_generate_text_success(mock_post):
     assert "json" in call_kwargs
     assert call_kwargs["json"]["prompt"] == "Tell me a joke"
     assert "model" in call_kwargs["json"]
+    assert call_kwargs["json"]["options"]["temperature"] == 0
 
 @pytest.mark.asyncio
 async def test_generate_empty_prompt():

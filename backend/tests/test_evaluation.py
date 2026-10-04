@@ -1,0 +1,73 @@
+import pytest
+from fastapi.testclient import TestClient
+from app.main import app
+
+client = TestClient(app)
+
+def test_evaluation_run_endpoint(monkeypatch):
+    # Mock ask_question so we don't actually hit Qdrant/Ollama
+    from app.schemas import RAGResponse, RetrievalResult
+    from app.api.rag import ask_question
+
+    async def mock_ask_question(req):
+        if "France" in req.query:
+            return RAGResponse(
+                answer="The information is not available.",
+                sources=[]
+            )
+        elif "adjacency matrix" in req.query.lower():
+            # q01: fail - missing "1" and "0"
+            return RAGResponse(
+                answer="The adjacency matrix A is an important concept.",
+                sources=[RetrievalResult(text="The adjacency matrix A is defined by A_i,j = 1 if (v_i, v_j) belongs to E, and 0 otherwise.", score=0.9, metadata={"filename": "test.pdf"})]
+            )
+        elif "degree matrix" in req.query.lower():
+            # q02: fail - missing "diagonal matrix"
+            return RAGResponse(
+                answer="The degree matrix D is a matrix where D_i,i = deg(v_i).",
+                sources=[RetrievalResult(text="The degree matrix D is a diagonal matrix where D_i,i = deg(v_i).", score=0.9, metadata={"filename": "test.pdf"})]
+            )
+        elif "shortest path length" in req.query.lower():
+            # q09: pass - uses alternative "minimum number of edges" instead of "distance"
+            return RAGResponse(
+                answer="Shortest path length calculates the minimum number of edges between the source and target.",
+                sources=[RetrievalResult(text="Shortest path length calculates the minimum number of edges between the source and target.", score=0.9, metadata={"filename": "test.pdf"})]
+            )
+
+        # default pass for all other answerable
+        return RAGResponse(
+            answer="dummy adjacency matrix 1 0 degree matrix diagonal matrix deg unnormalized laplacian L D A normalized laplacian algebraic connectivity second smallest eigenvalue Fiedler BFS layer-by-layer source node Queue DFS deep backtracking Stack Recursion shortest path minimum start node target node shortest path length steps distance",
+            sources=[RetrievalResult(
+                text="dummy adjacency matrix 1 0 degree matrix diagonal matrix deg unnormalized laplacian L D A normalized laplacian algebraic connectivity second smallest eigenvalue Fiedler BFS layer-by-layer source node Queue DFS deep backtracking Stack Recursion shortest path minimum start node target node shortest path length steps distance",
+                score=0.9,
+                metadata={"filename": "test.pdf"}
+            )]
+        )
+
+    monkeypatch.setattr('app.services.evaluation.ask_question', mock_ask_question)
+
+    response = client.post("/api/evaluation/run")
+    assert response.status_code == 200
+
+    data = response.json()
+    assert "summary" in data
+    assert "results" in data
+
+    summary = data["summary"]
+    assert summary["total_questions"] == 10
+    assert summary["answerable_questions"] == 9
+    assert summary["unanswerable_questions"] == 1
+
+    results = {r["id"]: r for r in data["results"]}
+
+    # q01 should fail
+    assert results["q01"]["answer_passed"] == False
+    assert "1" in results["q01"]["missing_answer_terms"]
+
+    # q02 should fail
+    assert results["q02"]["answer_passed"] == False
+    assert "diagonal matrix" in results["q02"]["missing_answer_terms"]
+
+    # q09 should pass using alternative
+    assert results["q09"]["answer_passed"] == True
+    assert len(results["q09"]["missing_answer_terms"]) == 0

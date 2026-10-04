@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, Fragment } from 'react'
 import {
   Database, FileText, CheckCircle, AlertCircle,
-  Loader2, Plus, ArrowUp, MessageSquare, Activity
+  Loader2, Plus, ArrowUp, MessageSquare, Activity, BarChart2
 } from 'lucide-react'
 
 interface IngestionResponse {
@@ -55,6 +55,37 @@ interface ChatSession {
 interface RAGResponse {
   answer: string
   sources: RetrievalResult[]
+}
+
+interface EvaluationCaseResult {
+  id: string
+  question: string
+  answerable: boolean
+  answer: string
+  expected_terms: string[]
+  missing_answer_terms: string[]
+  missing_source_terms: string[]
+  sources_count: number
+  has_sources: boolean
+  answer_passed: boolean
+  sources_passed: boolean
+  latency: number
+  diagnosis: string
+}
+
+interface EvaluationSummary {
+  total_questions: number
+  answerable_questions: number
+  unanswerable_questions: number
+  retrieval_success_count: number
+  answer_term_pass_count: number
+  refusal_success_count: number
+  average_latency: number
+}
+
+interface EvaluationResponse {
+  summary: EvaluationSummary
+  results: EvaluationCaseResult[]
 }
 
 const getRelevantPassage = (chunk: string, query: string) => {
@@ -275,6 +306,172 @@ function RetrievalInspector({ query, sources }: { query: string, sources: Retrie
   )
 }
 
+function EvaluationDashboard() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [data, setData] = useState<EvaluationResponse | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const runEvaluation = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('http://localhost:8000/api/evaluation/run', { method: 'POST' })
+      if (!res.ok) {
+        throw new Error('Evaluation failed')
+      }
+      const json = await res.json()
+      setData(json)
+    } catch (err: any) {
+      setError(err.message || 'Unknown error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto w-full h-full p-4 md:p-8">
+      <div className="max-w-5xl mx-auto flex flex-col gap-6 pt-12 md:pt-0">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-200">Evaluation Dashboard</h1>
+            <p className="text-[14px] text-gray-400 mt-1">Run and view RAG performance metrics</p>
+          </div>
+          <button
+            onClick={runEvaluation}
+            disabled={loading}
+            className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:bg-[#404040] disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
+            Run Evaluation
+          </button>
+        </div>
+
+        {error && (
+          <div className="p-4 bg-red-900/20 border border-red-900/30 rounded-xl text-red-400 text-sm flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {error}
+          </div>
+        )}
+
+        {data && (
+          <div className="flex flex-col gap-6 animate-in fade-in duration-500">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-[#262626] border border-white/5 rounded-xl p-4">
+                <div className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-2">Retrieval Success</div>
+                <div className="text-2xl font-semibold text-gray-200">
+                  {data.summary.retrieval_success_count}/{data.summary.answerable_questions}
+                </div>
+              </div>
+              <div className="bg-[#262626] border border-white/5 rounded-xl p-4">
+                <div className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-2">Answer Success</div>
+                <div className="text-2xl font-semibold text-gray-200">
+                  {data.summary.answer_term_pass_count}/{data.summary.answerable_questions}
+                </div>
+              </div>
+              <div className="bg-[#262626] border border-white/5 rounded-xl p-4">
+                <div className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-2">Refusal Success</div>
+                <div className="text-2xl font-semibold text-gray-200">
+                  {data.summary.refusal_success_count}/{data.summary.unanswerable_questions}
+                </div>
+              </div>
+              <div className="bg-[#262626] border border-white/5 rounded-xl p-4">
+                <div className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-2">Avg Latency</div>
+                <div className="text-2xl font-semibold text-gray-200">
+                  {data.summary.average_latency.toFixed(2)}s
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-[#262626] border border-white/5 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-[13px] text-gray-400">
+                  <thead className="bg-[#1c1c1c] border-b border-white/5 uppercase text-[11px] font-semibold text-gray-500 tracking-wider">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">ID</th>
+                      <th className="px-4 py-3 font-medium">Question</th>
+                      <th className="px-4 py-3 font-medium">Retrieval</th>
+                      <th className="px-4 py-3 font-medium">Answer</th>
+                      <th className="px-4 py-3 font-medium">Diagnosis</th>
+                      <th className="px-4 py-3 font-medium">Latency</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {data.results.map((res) => (
+                      <Fragment key={res.id}>
+                        <tr
+                          onClick={() => setExpandedId(expandedId === res.id ? null : res.id)}
+                          className="hover:bg-white/[0.02] cursor-pointer transition-colors"
+                        >
+                          <td className="px-4 py-3.5 font-medium text-gray-300 whitespace-nowrap">{res.id}</td>
+                          <td className="px-4 py-3.5 text-gray-300 truncate max-w-[200px]">{res.question}</td>
+                          <td className="px-4 py-3.5">
+                            {res.answerable ? (
+                              res.sources_passed ? <CheckCircle className="w-4 h-4 text-emerald-500/80" /> : <AlertCircle className="w-4 h-4 text-red-500/80" />
+                            ) : (
+                              <span className="text-gray-500">N/A</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            {res.answer_passed ? <CheckCircle className="w-4 h-4 text-emerald-500/80" /> : <AlertCircle className="w-4 h-4 text-red-500/80" />}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <span className={`px-2 py-1 rounded text-[11px] font-medium whitespace-nowrap ${res.diagnosis === 'Pass' ? 'bg-emerald-500/10 text-emerald-500/90' : 'bg-red-500/10 text-red-500/90'}`}>
+                              {res.diagnosis}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 whitespace-nowrap">{res.latency.toFixed(2)}s</td>
+                        </tr>
+                        {expandedId === res.id && (
+                          <tr className="bg-black/20 border-b border-white/5">
+                            <td colSpan={6} className="px-4 py-4">
+                               <div className="flex flex-col gap-3 text-[13px] text-gray-300">
+                                 <div><span className="text-gray-500 font-medium uppercase tracking-wider text-[11px] block mb-1">Question</span> {res.question}</div>
+                                 <div><span className="text-gray-500 font-medium uppercase tracking-wider text-[11px] block mb-1">Generated Answer</span> {res.answer}</div>
+
+                                 {res.answerable && (
+                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2 bg-[#212121] p-3 rounded-lg border border-white/5">
+                                      <div>
+                                        <div className="text-gray-500 font-medium uppercase tracking-wider text-[11px] mb-1">Expected Terms</div>
+                                        <div className="text-gray-300 font-mono text-[12px] break-words">{res.expected_terms.join(', ')}</div>
+                                      </div>
+                                      <div>
+                                        <div className="text-gray-500 font-medium uppercase tracking-wider text-[11px] mb-1">Missing Terms</div>
+                                        {res.missing_answer_terms.length === 0 && res.missing_source_terms.length === 0 ? (
+                                           <div className="text-emerald-500/80 font-mono text-[12px]">None</div>
+                                        ) : (
+                                           <div className="flex flex-col gap-1 text-red-400 font-mono text-[12px] break-words">
+                                              {res.missing_answer_terms.length > 0 && <div>Answer missing: {res.missing_answer_terms.join(', ')}</div>}
+                                              {res.missing_source_terms.length > 0 && <div>Sources missing: {res.missing_source_terms.join(', ')}</div>}
+                                           </div>
+                                        )}
+                                      </div>
+                                   </div>
+                                 )}
+
+                                 <div className="flex gap-6 mt-2 pt-2 border-t border-white/5">
+                                   <div><span className="text-gray-500 font-medium mr-2">Retrieval:</span> {res.has_sources ? `${res.sources_count} chunk(s)` : 'Failed'}</div>
+                                   <div><span className="text-gray-500 font-medium mr-2">Answer:</span> {res.answer_passed ? 'Passed' : 'Failed'}</div>
+                                   {!res.answerable && <div><span className="text-gray-500 font-medium mr-2">Refusal:</span> {res.answer_passed ? 'Passed' : 'Failed'}</div>}
+                                   <div><span className="text-gray-500 font-medium mr-2">Latency:</span> {res.latency.toFixed(2)}s</div>
+                                 </div>
+                               </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const [backendStatus, setBackendStatus] = useState<string>('checking...')
 
@@ -289,6 +486,7 @@ function App() {
   // Chat state
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [activeView, setActiveView] = useState<'chat' | 'evaluation'>('chat')
   const [sessionsLoaded, setSessionsLoaded] = useState(false)
 
   const [question, setQuestion] = useState('')
@@ -501,14 +699,23 @@ function App() {
              </div>
            </div>
 
-           {/* New Chat Action */}
-           <button
-             onClick={() => setActiveSessionId(null)}
-             className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-white/10 hover:bg-white/5 transition-colors cursor-pointer mb-6 group w-full"
-           >
-              <Plus className="w-4 h-4 text-gray-300" />
-              <span className="text-[14px] font-medium text-gray-200">New chat</span>
-           </button>
+           {/* Navigation */}
+           <div className="flex flex-col gap-1 mb-6">
+             <button
+               onClick={() => { setActiveView('chat'); setActiveSessionId(null); }}
+               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors cursor-pointer w-full ${activeView === 'chat' ? 'bg-[#2f2f2f] border-white/10 text-gray-200' : 'border-transparent text-gray-400 hover:bg-[#212121] hover:text-gray-300'}`}
+             >
+                <MessageSquare className="w-4 h-4" />
+                <span className="text-[14px] font-medium">Chat</span>
+             </button>
+             <button
+               onClick={() => setActiveView('evaluation')}
+               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors cursor-pointer w-full ${activeView === 'evaluation' ? 'bg-[#2f2f2f] border-white/10 text-gray-200' : 'border-transparent text-gray-400 hover:bg-[#212121] hover:text-gray-300'}`}
+             >
+                <BarChart2 className="w-4 h-4" />
+                <span className="text-[14px] font-medium">Evaluation</span>
+             </button>
+           </div>
 
            {/* Chats List */}
            <div className="flex-1 overflow-y-auto min-h-0 mb-4">
@@ -520,7 +727,7 @@ function App() {
                  {sessions.map(s => (
                    <button
                      key={s.id}
-                     onClick={() => setActiveSessionId(s.id)}
+                     onClick={() => { setActiveSessionId(s.id); setActiveView('chat'); }}
                      className={`flex items-center w-full px-3 py-2 rounded-lg text-left text-[13px] transition-colors ${activeSessionId === s.id ? 'bg-[#2f2f2f] text-gray-200' : 'text-gray-400 hover:bg-[#212121]'}`}
                    >
                      <MessageSquare className={`w-3.5 h-3.5 mr-2 shrink-0 ${activeSessionId === s.id ? 'text-gray-300' : 'text-gray-500'}`} />
@@ -627,124 +834,129 @@ function App() {
 
       {/* MAIN WORKSPACE */}
       <main className="flex-1 flex flex-col min-w-0 bg-[#212121] relative h-full">
+        {activeView === 'evaluation' ? (
+          <EvaluationDashboard />
+        ) : (
+          <>
+             <div className="flex-1 overflow-y-auto">
+                <div className="max-w-3xl mx-auto pt-20 md:pt-10 pb-40 px-4 md:px-6">
 
-         <div className="flex-1 overflow-y-auto">
-            <div className="max-w-3xl mx-auto pt-20 md:pt-10 pb-40 px-4 md:px-6">
+                   {/* Empty State */}
+                   {!hasMessages && !asking && (
+                     <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+                        <div className="w-12 h-12 bg-white flex items-center justify-center rounded-full mb-6">
+                           <Database className="w-6 h-6 text-black" />
+                        </div>
+                        <h2 className="text-2xl font-semibold text-gray-200 mb-2">Ask your documents</h2>
+                        <p className="text-[15px] text-gray-400">Upload a document and ask questions grounded in its contents.</p>
+                     </div>
+                   )}
 
-               {/* Empty State */}
-               {!hasMessages && !asking && (
-                 <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-                    <div className="w-12 h-12 bg-white flex items-center justify-center rounded-full mb-6">
-                       <Database className="w-6 h-6 text-black" />
-                    </div>
-                    <h2 className="text-2xl font-semibold text-gray-200 mb-2">Ask your documents</h2>
-                    <p className="text-[15px] text-gray-400">Upload a document and ask questions grounded in its contents.</p>
-                 </div>
-               )}
+                   {/* Active Conversation */}
+                   {hasMessages && (
+                     <div className="flex flex-col gap-8 animate-in fade-in duration-500">
+                        {activeSession!.messages.map((msg, msgIdx) => {
+                           if (msg.role === 'user') {
+                              return (
+                                <div key={msgIdx} className="flex justify-end mt-4">
+                                   <div className="bg-[#2f2f2f] px-5 py-3.5 rounded-3xl max-w-[85%] text-[15px] text-gray-100 whitespace-pre-wrap">
+                                      {msg.content}
+                                   </div>
+                                </div>
+                              )
+                           } else {
+                              return (
+                                <div key={msgIdx} className="flex gap-4">
+                                   <div className="w-8 h-8 rounded-full bg-white flex flex-shrink-0 items-center justify-center mt-1">
+                                      <Database className="w-5 h-5 text-black" />
+                                   </div>
+                                   <div className="flex flex-col min-w-0 w-full">
 
-               {/* Active Conversation */}
-               {hasMessages && (
-                 <div className="flex flex-col gap-8 animate-in fade-in duration-500">
-                    {activeSession!.messages.map((msg, msgIdx) => {
-                       if (msg.role === 'user') {
-                          return (
-                            <div key={msgIdx} className="flex justify-end mt-4">
-                               <div className="bg-[#2f2f2f] px-5 py-3.5 rounded-3xl max-w-[85%] text-[15px] text-gray-100 whitespace-pre-wrap">
-                                  {msg.content}
-                               </div>
-                            </div>
-                          )
-                       } else {
-                          return (
-                            <div key={msgIdx} className="flex gap-4">
-                               <div className="w-8 h-8 rounded-full bg-white flex flex-shrink-0 items-center justify-center mt-1">
-                                  <Database className="w-5 h-5 text-black" />
-                               </div>
-                               <div className="flex flex-col min-w-0 w-full">
+                                      {/* Answer Text */}
+                                      <div className="text-[16px] text-gray-200 leading-relaxed whitespace-pre-wrap">
+                                         {msg.content}
+                                      </div>
 
-                                  {/* Answer Text */}
-                                  <div className="text-[16px] text-gray-200 leading-relaxed whitespace-pre-wrap">
-                                     {msg.content}
-                                  </div>
+                                      {/* Retrieval Inspector */}
+                                      {msg.sources && msg.sources.length > 0 && (
+                                         <RetrievalInspector query={activeSession!.messages[msgIdx - 1]?.content || ''} sources={msg.sources} />
+                                      )}
 
-                                  {/* Retrieval Inspector */}
-                                  {msg.sources && msg.sources.length > 0 && (
-                                     <RetrievalInspector query={activeSession.messages[msgIdx - 1]?.content || ''} sources={msg.sources} />
-                                  )}
+                                      {/* Sources Block */}
+                                      {msg.sources && msg.sources.length > 0 && (
+                                         <div className="mt-6 border-t border-white/5 pt-5">
+                                            <div className="text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-4">Sources</div>
+                                            <div className="flex flex-col gap-3">
+                                                {msg.sources.map((source, idx) => (
+                                                   <SourceCard key={idx} source={source} query={activeSession!.messages[msgIdx - 1]?.content || ''} />
+                                                ))}
+                                            </div>
+                                         </div>
+                                      )}
+                                   </div>
+                                </div>
+                              )
+                           }
+                        })}
+                        {asking && (
+                           <div className="flex gap-4">
+                              <div className="w-8 h-8 rounded-full bg-white flex flex-shrink-0 items-center justify-center mt-1">
+                                 <Database className="w-5 h-5 text-black" />
+                              </div>
+                              <div className="flex items-center text-gray-400">
+                                 <Loader2 className="w-5 h-5 animate-spin" />
+                              </div>
+                           </div>
+                        )}
+                        <div ref={messagesEndRef} />
+                     </div>
+                   )}
+                </div>
+             </div>
 
-                                  {/* Sources Block */}
-                                  {msg.sources && msg.sources.length > 0 && (
-                                     <div className="mt-6 border-t border-white/5 pt-5">
-                                        <div className="text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-4">Sources</div>
-                                        <div className="flex flex-col gap-3">
-                                            {msg.sources.map((source, idx) => (
-                                               <SourceCard key={idx} source={source} query={activeSession!.messages[msgIdx - 1]?.content || ''} />
-                                            ))}
-                                        </div>
-                                     </div>
-                                  )}
-                               </div>
-                            </div>
-                          )
-                       }
-                    })}
-                    {asking && (
-                       <div className="flex gap-4">
-                          <div className="w-8 h-8 rounded-full bg-white flex flex-shrink-0 items-center justify-center mt-1">
-                             <Database className="w-5 h-5 text-black" />
-                          </div>
-                          <div className="flex items-center text-gray-400">
-                             <Loader2 className="w-5 h-5 animate-spin" />
-                          </div>
-                       </div>
-                    )}
-                    <div ref={messagesEndRef} />
-                 </div>
-               )}
-            </div>
-         </div>
+             {/* COMPOSER AT BOTTOM */}
+             <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-[#212121] via-[#212121] to-transparent pt-10 pb-6 px-4 md:px-6">
+                <div className="max-w-3xl mx-auto relative">
 
-         {/* COMPOSER AT BOTTOM */}
-         <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-[#212121] via-[#212121] to-transparent pt-10 pb-6 px-4 md:px-6">
-            <div className="max-w-3xl mx-auto relative">
+                   {askError && (
+                     <div className="mb-3 px-4 py-3 bg-red-900/20 border border-red-900/30 rounded-lg text-[13px] text-red-400 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>{askError}</span>
+                     </div>
+                   )}
 
-               {askError && (
-                 <div className="mb-3 px-4 py-3 bg-red-900/20 border border-red-900/30 rounded-lg text-[13px] text-red-400 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{askError}</span>
-                 </div>
-               )}
-
-               <div className="relative flex items-end bg-[#2f2f2f] rounded-[24px] focus-within:ring-1 ring-gray-400 shadow-md">
-                  <input
-                    type="text"
-                    placeholder={documents.length > 0 ? "Ask something about your documents..." : "Upload a document to ask questions..."}
-                    className="w-full bg-transparent text-[15px] text-gray-100 placeholder-gray-400 px-5 py-4 pr-14 focus:outline-none rounded-[24px]"
-                    value={question}
-                    disabled={documents.length === 0 || asking}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleAsk()
-                      }
-                    }}
-                  />
-                  <div className="absolute right-2.5 bottom-2.5">
-                     <button
-                       onClick={handleAsk}
-                       disabled={asking || !question.trim() || documents.length === 0}
-                       className="w-9 h-9 rounded-full bg-white text-black hover:bg-gray-200 disabled:bg-[#404040] disabled:text-gray-500 transition-colors flex items-center justify-center"
-                     >
-                       {asking ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}
-                     </button>
-                  </div>
-               </div>
-               <div className="text-center mt-3 text-[11px] text-gray-500">
-                  RAGLab can make mistakes. Verify important information with the sources.
-               </div>
-            </div>
-         </div>
+                   <div className="relative flex items-end bg-[#2f2f2f] rounded-[24px] focus-within:ring-1 ring-gray-400 shadow-md">
+                      <input
+                        type="text"
+                        placeholder={documents.length > 0 ? "Ask something about your documents..." : "Upload a document to ask questions..."}
+                        className="w-full bg-transparent text-[15px] text-gray-100 placeholder-gray-400 px-5 py-4 pr-14 focus:outline-none rounded-[24px]"
+                        value={question}
+                        disabled={documents.length === 0 || asking}
+                        onChange={(e) => setQuestion(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            handleAsk()
+                          }
+                        }}
+                      />
+                      <div className="absolute right-2.5 bottom-2.5">
+                         <button
+                           onClick={handleAsk}
+                           disabled={asking || !question.trim() || documents.length === 0}
+                           className="w-9 h-9 rounded-full bg-white text-black hover:bg-gray-200 disabled:bg-[#404040] disabled:text-gray-500 transition-colors flex items-center justify-center"
+                         >
+                           {asking ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}
+                         </button>
+                      </div>
+                   </div>
+                   <div className="text-center mt-3 text-[11px] text-gray-500">
+                      RAGLab can make mistakes. Verify important information with the sources.
+                   </div>
+                </div>
+             </div>
+          </>
+        )}
       </main>
     </div>
   )

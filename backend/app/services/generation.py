@@ -15,7 +15,10 @@ async def generate_text(prompt: str) -> str:
     payload = {
         "model": settings.GENERATION_MODEL,
         "prompt": prompt,
-        "stream": False
+        "stream": False,
+        "options": {
+            "temperature": 0
+        }
     }
 
     try:
