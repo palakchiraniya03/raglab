@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   Database, FileText, CheckCircle, AlertCircle,
   Loader2, Plus, ArrowUp, MessageSquare, Activity
@@ -57,9 +57,118 @@ interface RAGResponse {
   sources: RetrievalResult[]
 }
 
-function SourceCard({ source }: { source: RetrievalResult }) {
+const getRelevantPassage = (chunk: string, query: string) => {
+  const MAX_LENGTH = 300
+  if (chunk.length <= MAX_LENGTH) {
+    return { passage: chunk, found: false }
+  }
+
+  let normChunk = ''
+  const normToOrig: number[] = []
+
+  let inSpace = false
+  for (let i = 0; i < chunk.length; i++) {
+    const char = chunk[i]
+    if (/\s/.test(char)) {
+      if (!inSpace) {
+        normToOrig.push(i)
+        normChunk += ' '
+        inSpace = true
+      }
+    } else {
+      normToOrig.push(i)
+      normChunk += char.toLowerCase()
+      inSpace = false
+    }
+  }
+  normToOrig.push(chunk.length)
+
+  const STOP_WORDS = new Set(['what', 'is', 'the', 'of', 'a', 'an', 'are', 'was', 'were', 'to', 'in', 'on', 'for', 'and', 'or', 'how', 'why', 'which'])
+
+  const cleanQuery = query.toLowerCase().replace(/[^\w\s]/g, '')
+  const terms = cleanQuery.split(/\s+/).filter(t => t.length > 2 && !STOP_WORDS.has(t))
+
+  if (terms.length === 0) {
+    return {
+      passage: chunk.substring(0, MAX_LENGTH) + '...',
+      found: false
+    }
+  }
+
+  const phrase = terms.join(' ')
+
+  const scoreWindowOrig = (origStart: number) => {
+    const origEnd = Math.min(chunk.length, origStart + MAX_LENGTH)
+
+    const windowOrig = chunk.substring(origStart, origEnd)
+    const windowNorm = windowOrig.toLowerCase().replace(/\s+/g, ' ')
+
+    let score = 0
+    let termsFound = 0
+    for (const term of terms) {
+      if (windowNorm.includes(term)) {
+        score += 10
+        termsFound++
+      }
+    }
+
+    if (termsFound === 0) score -= 500
+    if (windowNorm.includes(phrase)) score += 1000
+
+    const codePatterns = ['np.', 'nx.', 'def ', 'return ', 'toarray', '=', '_', '{', '}', '[', ']', 'λ', 'diag', 'matrix', 'import ']
+    const lowerWindowOrig = windowOrig.toLowerCase()
+    for (const pat of codePatterns) {
+      score -= (lowerWindowOrig.split(pat).length - 1) * 3
+    }
+
+    return { score, origStart, origEnd, termsFound }
+  }
+
+  let bestResult = null
+  let pos = normChunk.indexOf(phrase)
+
+  if (pos !== -1) {
+    while (pos !== -1) {
+      const matchOrigStart = normToOrig[pos]
+      // Start exactly at the matched concept to avoid pulling in preceding code
+      const windowStartOrig = matchOrigStart
+
+      const res = scoreWindowOrig(windowStartOrig)
+      if (!bestResult || res.score > bestResult.score) {
+        bestResult = res
+      }
+      pos = normChunk.indexOf(phrase, pos + 1)
+    }
+  } else {
+    // Slide over original chunk only if no exact phrase match was found
+    for (let i = 0; i <= chunk.length; i += 50) {
+      const res = scoreWindowOrig(i)
+      if (!bestResult || res.score > bestResult.score) {
+        bestResult = res
+      }
+    }
+  }
+
+  if (bestResult && bestResult.termsFound > 0) {
+    let passage = chunk.substring(bestResult.origStart, bestResult.origEnd)
+    if (pos === -1 && bestResult.origStart > 0) passage = '...' + passage
+    if (bestResult.origEnd < chunk.length) passage = passage + '...'
+    return { passage, found: true }
+  }
+
+  return {
+    passage: chunk.substring(0, MAX_LENGTH) + '...',
+    found: false
+  }
+}
+
+function SourceCard({ source, query }: { source: RetrievalResult, query: string }) {
   const [expanded, setExpanded] = useState(false)
   const isLong = source.text.length > 300
+
+  const { passage, found } = useMemo(() => {
+     return getRelevantPassage(source.text, query)
+  }, [source.text, query])
 
   return (
     <div className="bg-[#262626] border border-white/5 rounded-xl p-4 flex flex-col gap-3">
@@ -74,9 +183,25 @@ function SourceCard({ source }: { source: RetrievalResult }) {
        </div>
 
        <div>
-          <div className={`text-gray-400 text-[13.5px] leading-[1.7] whitespace-pre-wrap break-words ${!expanded && isLong ? 'line-clamp-4' : ''}`}>
-             {source.text}
-          </div>
+          {!expanded ? (
+             <>
+                <div className="text-xs font-medium text-gray-400 mb-2">
+                   {found ? "Relevant passage" : "Retrieved passage"}
+                </div>
+                <div className="text-gray-300 text-[13.5px] leading-[1.7] whitespace-pre-wrap break-words">
+                   {passage}
+                </div>
+             </>
+          ) : (
+             <>
+                <div className="text-xs font-medium text-gray-400 mb-2">
+                   Full chunk context
+                </div>
+                <div className="text-gray-400 text-[13.5px] leading-[1.7] whitespace-pre-wrap break-words">
+                   {source.text}
+                </div>
+             </>
+          )}
        </div>
 
        {isLong && (
@@ -84,7 +209,7 @@ function SourceCard({ source }: { source: RetrievalResult }) {
              onClick={() => setExpanded(!expanded)}
              className="text-xs font-medium text-gray-500 hover:text-gray-300 transition-colors self-start mt-1"
           >
-             {expanded ? "Show less" : "Show more"}
+             {expanded ? "Show less" : "Show surrounding context"}
           </button>
        )}
     </div>
@@ -553,7 +678,7 @@ function App() {
                                         <div className="text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-4">Sources</div>
                                         <div className="flex flex-col gap-3">
                                             {msg.sources.map((source, idx) => (
-                                               <SourceCard key={idx} source={source} />
+                                               <SourceCard key={idx} source={source} query={activeSession!.messages[msgIdx - 1]?.content || ''} />
                                             ))}
                                         </div>
                                      </div>
