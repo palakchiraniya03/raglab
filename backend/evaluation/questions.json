@@ -1,0 +1,115 @@
+[
+  {
+    "id": "q01",
+    "question": "What is an adjacency matrix?",
+    "expected_answer": "The adjacency matrix A is defined by A_i,j = 1 if (v_i, v_j) belongs to E, and 0 otherwise.",
+    "expected_terms": [
+      "adjacency matrix",
+      "1",
+      "0"
+    ],
+    "answerable": true
+  },
+  {
+    "id": "q02",
+    "question": "What is a degree matrix?",
+    "expected_answer": "The degree matrix D is a diagonal matrix where D_i,i = deg(v_i).",
+    "expected_terms": [
+      "degree matrix",
+      "diagonal matrix",
+      "deg"
+    ],
+    "answerable": true
+  },
+  {
+    "id": "q03",
+    "question": "What is the unnormalized Laplacian matrix?",
+    "expected_answer": "The unnormalized Laplacian matrix L is defined as L = D - A.",
+    "expected_terms": [
+      "unnormalized laplacian",
+      "L",
+      "D",
+      "A"
+    ],
+    "answerable": true
+  },
+  {
+    "id": "q04",
+    "question": "What is the normalized Laplacian matrix?",
+    "expected_answer": "The normalized Laplacian matrix L_N is defined as L_N = D^(-1/2) L D^(-1/2) = I - D^(-1/2) A D^(-1/2).",
+    "expected_terms": [
+      "normalized laplacian",
+      "D",
+      "L",
+      "A"
+    ],
+    "answerable": true
+  },
+  {
+    "id": "q05",
+    "question": "What is algebraic connectivity?",
+    "expected_answer": "Algebraic connectivity (λ2) is the second smallest eigenvalue of the Laplacian matrix L, also called the Fiedler Value.",
+    "expected_terms": [
+      "algebraic connectivity",
+      "second smallest eigenvalue",
+      "Fiedler"
+    ],
+    "answerable": true
+  },
+  {
+    "id": "q06",
+    "question": "What is Breadth-First Search (BFS)?",
+    "expected_answer": "BFS explores nodes layer-by-layer (level-wise) starting from a source node using a Queue.",
+    "expected_terms": [
+      "BFS",
+      "layer-by-layer",
+      "source node",
+      "Queue"
+    ],
+    "answerable": true
+  },
+  {
+    "id": "q07",
+    "question": "What is Depth-First Search (DFS)?",
+    "expected_answer": "DFS explores as deep as possible along each branch before backtracking using a Stack or Recursion.",
+    "expected_terms": [
+      "DFS",
+      "deep",
+      "backtracking",
+      "Stack",
+      "Recursion"
+    ],
+    "answerable": true
+  },
+  {
+    "id": "q08",
+    "question": "What is a shortest path?",
+    "expected_answer": "A shortest path finds the sequence of edges with the minimum total cost or number of edges between a start node and target node.",
+    "expected_terms": [
+      "shortest path",
+      "minimum",
+      "start node",
+      "target node"
+    ],
+    "answerable": true
+  },
+  {
+    "id": "q09",
+    "question": "What is shortest path length?",
+    "expected_answer": "Shortest path length calculates the minimum number of steps or distance between the source and target.",
+    "expected_terms": [
+      "shortest path length",
+      "minimum",
+      "steps",
+      "distance"
+    ],
+    "answerable": true
+  },
+  {
+    "id": "q10",
+    "question": "What is the capital of France?",
+    "expected_answer": "The information is not available in the provided document.",
+    "expected_terms": [],
+    "answerable": false
+  }
+]

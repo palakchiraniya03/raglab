@@ -60,24 +60,21 @@ async def ask_question(request: RetrievalRequest):
     context_string = "\n".join(context_parts)
 
     # 4. Build prompt
-    prompt = f"""You are a document question-answering assistant. The retrieved context is your sole source of truth.
+    prompt = f"""
+    Answer the question using only the information in the context.
 
-Important Instructions:
-- Keep the answer concise.
-- If the context contains an explicit definition, use that definition as the basis of the answer.
-- Do not replace an explicit definition with a related concept from general knowledge.
-- Do not introduce facts, definitions, formulas, or interpretations that are not supported by the context.
-- For conceptual questions, prefer the exact mathematical/textual definition present in the context over related examples, applications, algorithms, or code.
-- If multiple context chunks contain relevant information, combine them only when they are consistent.
-- If the context does not clearly support an answer, say that the information is not available in the provided documents.
+    Context:
+    {context_string}
 
-Context:
-{context_string}
+    Question:
+    {request.query}
 
-Question:
-{request.query}
+    Give a short, direct answer based on the context.
+    If the context does not contain the answer, say:
+    "The information is not available in the provided documents."
 
-Answer:"""
+    Answer:
+    """
 
     # 5. Generate answer
     try:

@@ -64,7 +64,8 @@ def test_rag_success(mock_search_chunks, mock_generate_text):
     assert "graph.pdf" in prompt
     assert "Page: 2" in prompt
     assert "What is the Laplacian matrix?" in prompt
-    assert "sole source of truth" in prompt
+    assert "only source of truth" in prompt
+    
 
 
 
