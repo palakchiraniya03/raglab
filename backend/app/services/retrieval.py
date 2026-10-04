@@ -69,9 +69,13 @@ async def search_chunks(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
 
         formatted_results.append({
             "text": text,
-            # Returning final_score so that it correctly passes RAG boundaries
+            # Returning final_score as 'score' so that it correctly passes RAG boundaries
             # downstream which expect score >= 0.50
             "score": final_score,
+            "semantic_score": hit.score,
+            "lexical_boost": lexical_boost,
+            "final_score": final_score,
+            "selected": final_score >= settings.RETRIEVAL_SCORE_THRESHOLD,
             "metadata": metadata
         })
 

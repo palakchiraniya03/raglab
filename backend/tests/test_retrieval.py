@@ -75,6 +75,9 @@ async def test_search_chunks_threshold(mock_search, mock_embed):
     # Only 2 should remain
     assert len(results) == 2
     assert results[0]["text"] == "High score"
+    assert results[0]["semantic_score"] == 0.60
+    assert results[0]["final_score"] == results[0]["score"]
+    assert results[0]["selected"] is True
     assert results[1]["text"] == "Exact threshold"
 
 @pytest.mark.asyncio
@@ -129,6 +132,10 @@ async def test_search_chunks_lexical_fiedler(mock_search, mock_embed):
     # query tokens: fiedler, value. chunk tokens: fiedler, value -> overlap = 2/2 = 1.0 -> boost = 0.07. 0.45 + 0.07 = 0.52 >= 0.50
     assert len(results) == 1
     assert results[0]["score"] == 0.52
+    assert results[0]["semantic_score"] == 0.45
+    assert results[0]["lexical_boost"] == 0.07
+    assert results[0]["final_score"] == 0.52
+    assert results[0]["selected"] is True
 
 @pytest.mark.asyncio
 @patch("app.services.retrieval.embed_text", new_callable=AsyncMock)
