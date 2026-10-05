@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     GENERATION_MODEL: str = "gemma3:1b"
     RETRIEVAL_SCORE_THRESHOLD: float = 0.50
     RAG_MAX_CONTEXT_CHUNKS: int = 3
+    LEXICAL_BOOST_WEIGHT: float = 0.07
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

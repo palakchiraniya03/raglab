@@ -8,13 +8,14 @@ class RetrievalError(Exception):
 
 STOP_WORDS = {"what", "is", "the", "of", "a", "an", "are", "was", "were",
               "to", "in", "on", "for", "and", "or", "how", "why", "which"}
-MAX_LEXICAL_BOOST = 0.07
 
 def _calculate_lexical_boost(query: str, chunk_text: str) -> float:
     """
     Calculates a small lexical relevance boost based on the fraction of
     meaningful query tokens that appear in the chunk text.
     """
+    from app.config import settings
+    
     query_clean = re.sub(r'[^\w\s]', '', query.lower())
     chunk_clean = re.sub(r'[^\w\s]', '', chunk_text.lower())
 
@@ -25,7 +26,7 @@ def _calculate_lexical_boost(query: str, chunk_text: str) -> float:
     chunk_tokens = set(chunk_clean.split())
     overlap = len(query_tokens.intersection(chunk_tokens))
 
-    return (overlap / len(query_tokens)) * MAX_LEXICAL_BOOST
+    return (overlap / len(query_tokens)) * settings.LEXICAL_BOOST_WEIGHT
 
 from typing import List, Dict, Any, Optional
 

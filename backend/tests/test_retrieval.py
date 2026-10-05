@@ -173,12 +173,30 @@ async def test_search_chunks_lexical_stopwords(mock_search, mock_embed):
     # No meaningful tokens, boost = 0. 0.49 < 0.50 -> dropped
     assert len(results) == 0
 
-def test_calculate_lexical_boost_max():
+def test_calculate_lexical_boost_default():
     from app.services.retrieval import _calculate_lexical_boost
+    from app.config import settings
+
+    # Ensure default is 0.07
+    assert settings.LEXICAL_BOOST_WEIGHT == 0.07
 
     boost = _calculate_lexical_boost("test query", "test query")
     assert boost == 0.07
 
-    # Partial
+    # Partial (2/3 overlap)
     boost2 = _calculate_lexical_boost("test query another", "test query missing")
     assert abs(boost2 - (2/3 * 0.07)) < 1e-6
+
+def test_calculate_lexical_boost_parameterized(monkeypatch):
+    from app.services.retrieval import _calculate_lexical_boost
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "LEXICAL_BOOST_WEIGHT", 0.10)
+
+    boost = _calculate_lexical_boost("test query", "test query")
+    assert boost == 0.10
+
+    # Partial (1/2 overlap since 'test' and 'query' are 2 tokens, one matches)
+    # Wait, 'test query' vs 'test missing': 1/2 match
+    boost2 = _calculate_lexical_boost("test query", "test missing")
+    assert abs(boost2 - 0.05) < 1e-6
