@@ -193,7 +193,7 @@ const getRelevantPassage = (chunk: string, query: string) => {
   }
 }
 
-function SourceCard({ source, query }: { source: RetrievalResult, query: string }) {
+function SourceCard({ source, query, index }: { source: RetrievalResult, query: string, index: number }) {
   const [expanded, setExpanded] = useState(false)
   const isLong = source.text.length > 300
 
@@ -206,7 +206,7 @@ function SourceCard({ source, query }: { source: RetrievalResult, query: string 
        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500 border-b border-white/5 pb-3">
           <span className="font-medium text-gray-300 flex items-center gap-1.5">
             <FileText className="w-3.5 h-3.5" />
-            {source.metadata.filename}
+            {index}. {source.metadata.filename}
           </span>
           {source.metadata.page !== null && <span>Page {source.metadata.page}</span>}
           <span>Chunk {source.metadata.chunk_index}</span>
@@ -917,13 +917,13 @@ function App() {
                                          <RetrievalInspector query={activeSession!.messages[msgIdx - 1]?.content || ''} sources={msg.sources} />
                                       )}
 
-                                      {/* Sources Block */}
+                                     {/* Sources Block */}
                                       {msg.sources && msg.sources.length > 0 && (
                                          <div className="mt-6 border-t border-white/5 pt-5">
                                             <div className="text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-4">Sources</div>
                                             <div className="flex flex-col gap-3">
                                                 {msg.sources.map((source, idx) => (
-                                                   <SourceCard key={idx} source={source} query={activeSession!.messages[msgIdx - 1]?.content || ''} />
+                                                   <SourceCard key={idx} source={source} query={activeSession!.messages[msgIdx - 1]?.content || ''} index={idx + 1} />
                                                 ))}
                                             </div>
                                          </div>
