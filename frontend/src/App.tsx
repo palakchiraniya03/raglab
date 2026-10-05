@@ -406,6 +406,24 @@ function EvaluationDashboard() {
                   {data.summary.average_latency.toFixed(2)}s
                 </div>
               </div>
+              <div className="bg-[#262626] border border-white/5 rounded-xl p-4">
+                <div className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-2">Retrieval Hit Rate</div>
+                <div className="text-2xl font-semibold text-gray-200">
+                  {((data.summary.retrieval_hit_rate || 0) * 100).toFixed(1)}%
+                </div>
+              </div>
+              <div className="bg-[#262626] border border-white/5 rounded-xl p-4">
+                <div className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-2">Avg Precision@K</div>
+                <div className="text-2xl font-semibold text-gray-200">
+                  {((data.summary.avg_precision_at_k || 0) * 100).toFixed(1)}%
+                </div>
+              </div>
+              <div className="bg-[#262626] border border-white/5 rounded-xl p-4">
+                <div className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-2">Avg MRR</div>
+                <div className="text-2xl font-semibold text-gray-200">
+                  {((data.summary.avg_mrr || 0) * 100).toFixed(1)}%
+                </div>
+              </div>
             </div>
 
             <div className="bg-[#262626] border border-white/5 rounded-xl overflow-hidden">
@@ -417,6 +435,8 @@ function EvaluationDashboard() {
                       <th className="px-4 py-3 font-medium">Question</th>
                       <th className="px-4 py-3 font-medium">Retrieval</th>
                       <th className="px-4 py-3 font-medium">Answer</th>
+                      <th className="px-4 py-3 font-medium">Precision@K</th>
+                      <th className="px-4 py-3 font-medium">MRR</th>
                       <th className="px-4 py-3 font-medium">Diagnosis</th>
                       <th className="px-4 py-3 font-medium">Latency</th>
                     </tr>
@@ -440,6 +460,12 @@ function EvaluationDashboard() {
                           <td className="px-4 py-3.5">
                             {res.answer_passed ? <CheckCircle className="w-4 h-4 text-emerald-500/80" /> : <AlertCircle className="w-4 h-4 text-red-500/80" />}
                           </td>
+                          <td className="px-4 py-3.5 text-gray-300">
+                            {res.precision_at_k !== undefined && res.precision_at_k !== null ? res.precision_at_k.toFixed(2) : 'N/A'}
+                          </td>
+                          <td className="px-4 py-3.5 text-gray-300">
+                            {res.mrr !== undefined && res.mrr !== null ? res.mrr.toFixed(2) : 'N/A'}
+                          </td>
                           <td className="px-4 py-3.5">
                             <span className={`px-2 py-1 rounded text-[11px] font-medium whitespace-nowrap ${res.diagnosis === 'Pass' ? 'bg-emerald-500/10 text-emerald-500/90' : 'bg-red-500/10 text-red-500/90'}`}>
                               {res.diagnosis}
@@ -449,7 +475,7 @@ function EvaluationDashboard() {
                         </tr>
                         {expandedId === res.id && (
                           <tr className="bg-black/20 border-b border-white/5">
-                            <td colSpan={6} className="px-4 py-4">
+                            <td colSpan={8} className="px-4 py-4">
                                <div className="flex flex-col gap-3 text-[13px] text-gray-300">
                                  <div><span className="text-gray-500 font-medium uppercase tracking-wider text-[11px] block mb-1">Question</span> {res.question}</div>
                                  <div><span className="text-gray-500 font-medium uppercase tracking-wider text-[11px] block mb-1">Generated Answer</span> {res.answer}</div>
@@ -471,6 +497,46 @@ function EvaluationDashboard() {
                                            </div>
                                         )}
                                       </div>
+                                   </div>
+                                 )}
+
+                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                                   <div className="bg-[#212121] p-3 rounded-lg border border-white/5">
+                                     <div className="text-gray-500 font-medium uppercase tracking-wider text-[11px] mb-2">Retrieval Metrics</div>
+                                     <div className="grid grid-cols-3 gap-2">
+                                       <div><span className="text-gray-500 font-medium text-[12px] mr-2">Hit:</span> {res.retrieval_hit !== undefined && res.retrieval_hit !== null ? (res.retrieval_hit ? 'Yes' : 'No') : 'N/A'}</div>
+                                       <div><span className="text-gray-500 font-medium text-[12px] mr-2">P@K:</span> {res.precision_at_k !== undefined && res.precision_at_k !== null ? res.precision_at_k.toFixed(2) : 'N/A'}</div>
+                                       <div><span className="text-gray-500 font-medium text-[12px] mr-2">MRR:</span> {res.mrr !== undefined && res.mrr !== null ? res.mrr.toFixed(2) : 'N/A'}</div>
+                                     </div>
+                                   </div>
+
+                                   <div className="bg-[#212121] p-3 rounded-lg border border-white/5">
+                                     <div className="text-gray-500 font-medium uppercase tracking-wider text-[11px] mb-2">Generation Info</div>
+                                     <div className="grid grid-cols-2 gap-2">
+                                       <div><span className="text-gray-500 font-medium text-[12px] mr-2">Model:</span> {res.reproducibility?.model || 'N/A'}</div>
+                                       <div><span className="text-gray-500 font-medium text-[12px] mr-2">Temp:</span> {res.reproducibility?.temperature !== undefined ? res.reproducibility.temperature : 'N/A'}</div>
+                                     </div>
+                                   </div>
+                                 </div>
+
+                                 {res.retrieved_chunks_info && res.retrieved_chunks_info.length > 0 && (
+                                   <div className="mt-2 bg-[#212121] p-3 rounded-lg border border-white/5">
+                                     <div className="text-gray-500 font-medium uppercase tracking-wider text-[11px] mb-2">Retrieved Chunks</div>
+                                     <div className="flex flex-col gap-2">
+                                       {res.retrieved_chunks_info.map((chunk, idx) => (
+                                         <div key={idx} className="flex flex-col text-[12px] pb-2 border-b border-white/5 last:border-0 last:pb-0">
+                                           <div className="flex justify-between mb-1">
+                                             <div className="font-medium text-gray-300">Rank {chunk.rank}: {chunk.filename}</div>
+                                             <div className={chunk.is_relevant ? "text-emerald-500/90 font-medium" : "text-gray-500 font-medium"}>
+                                               {chunk.is_relevant ? 'Relevant' : 'Not relevant'}
+                                             </div>
+                                           </div>
+                                           {chunk.metadata && chunk.metadata.page !== undefined && (
+                                             <div className="text-gray-500">Page: {chunk.metadata.page}</div>
+                                           )}
+                                         </div>
+                                       ))}
+                                     </div>
                                    </div>
                                  )}
 
