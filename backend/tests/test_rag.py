@@ -7,9 +7,10 @@ from app.services.generation import GenerationError
 
 client = TestClient(app)
 
+@patch("app.api.rag.log_activity")
 @patch("app.api.rag.generate_text", new_callable=AsyncMock)
 @patch("app.api.rag.search_chunks", new_callable=AsyncMock)
-def test_rag_success(mock_search_chunks, mock_generate_text):
+def test_rag_success(mock_search_chunks, mock_generate_text, mock_log_activity):
     mock_search_chunks.return_value = [
         {
             "text": "The Laplacian matrix is L = D - A.",
@@ -58,6 +59,14 @@ def test_rag_success(mock_search_chunks, mock_generate_text):
 
     mock_search_chunks.assert_called_once_with(query="What is the Laplacian matrix?", top_k=2, document_id=None)
     mock_generate_text.assert_called_once()
+    
+    import hashlib
+    from app.config import settings
+    expected_prompt = mock_generate_text.call_args[1]["prompt"]
+    assert "reproducibility" in data
+    assert data["reproducibility"]["prompt"] == expected_prompt
+    assert data["reproducibility"]["model"] == settings.GENERATION_MODEL
+    assert data["reproducibility"]["temperature"] == 0.0
 
     # Verify prompt construction
     prompt = mock_generate_text.call_args[1]["prompt"]
@@ -69,6 +78,12 @@ def test_rag_success(mock_search_chunks, mock_generate_text):
         assert "Page: 2" in prompt
     assert "What is the Laplacian matrix?" in prompt
     assert "using the provided document context" in prompt
+
+    # Verify log_activity prompt_hash
+    mock_log_activity.assert_called_once()
+    log_args = mock_log_activity.call_args[1]
+    assert "prompt_hash" in log_args["details"]
+    assert log_args["details"]["prompt_hash"] == hashlib.sha256(expected_prompt.encode('utf-8')).hexdigest()
 
 @patch("app.api.rag.generate_text", new_callable=AsyncMock)
 @patch("app.api.rag.search_chunks", new_callable=AsyncMock)
@@ -161,6 +176,10 @@ def test_rag_compare_operation(mock_search_chunks, mock_generate_text):
     
     # Verify it does NOT contain standard QA instructions
     assert "For conceptual/definition questions" not in prompt
+
+    assert "reproducibility" in data
+    assert data["reproducibility"]["prompt"] == prompt
+    assert data["reproducibility"]["temperature"] == 0.0
 
 @patch("app.api.rag.generate_text", new_callable=AsyncMock)
 @patch("app.api.rag.search_chunks", new_callable=AsyncMock)

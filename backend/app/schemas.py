@@ -56,9 +56,15 @@ class GenerationRequest(BaseModel):
 class GenerationResponse(BaseModel):
     text: str
 
+class ReproducibilityInfo(BaseModel):
+    prompt: str
+    model: str
+    temperature: float
+
 class RAGResponse(BaseModel):
     answer: str
     sources: List[RetrievalResult]
+    reproducibility: Optional[ReproducibilityInfo] = None
 
 
 class EvaluationCaseResult(BaseModel):

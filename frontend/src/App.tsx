@@ -39,11 +39,18 @@ interface RetrievalResult {
   }
 }
 
+interface ReproducibilityInfo {
+  prompt: string
+  model: string
+  temperature: number
+}
+
 interface ChatMessage {
   role: "user" | "assistant"
   content: string
   sources?: RetrievalResult[]
   operation?: 'ask' | 'compare'
+  reproducibility?: ReproducibilityInfo
 }
 
 interface ChatSession {
@@ -56,6 +63,7 @@ interface ChatSession {
 interface RAGResponse {
   answer: string
   sources: RetrievalResult[]
+  reproducibility?: ReproducibilityInfo
 }
 
 interface EvaluationCaseResult {
@@ -473,6 +481,34 @@ function EvaluationDashboard() {
   )
 }
 
+function ReproducibilityInspector({ info }: { info: ReproducibilityInfo }) {
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <div className="mt-4">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="text-[11px] uppercase tracking-wider text-gray-500 hover:text-gray-300 font-medium transition-colors"
+      >
+        {expanded ? 'Hide Generation Info' : 'Inspect Generation Info'}
+      </button>
+
+      {expanded && (
+        <div className="mt-3 bg-[#1e1e1e] border border-white/10 rounded-lg p-4 flex flex-col gap-3">
+          <div className="flex gap-4 text-xs text-gray-400">
+            <div><span className="text-gray-500 mr-1">Model:</span>{info.model}</div>
+            <div><span className="text-gray-500 mr-1">Temperature:</span>{info.temperature}</div>
+          </div>
+          <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-1">Exact Prompt</div>
+          <pre className="text-xs text-gray-300 font-mono bg-[#141414] p-4 rounded-md overflow-x-auto whitespace-pre-wrap max-h-96 overflow-y-auto">
+            {info.prompt}
+          </pre>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function App() {
   const [backendStatus, setBackendStatus] = useState<string>('checking...')
 
@@ -691,7 +727,7 @@ function App() {
           const updatedSession = { ...newSessions[idx] }
           updatedSession.messages = [
             ...updatedSession.messages,
-            { role: "assistant", content: data.answer, sources: data.sources }
+            { role: "assistant", content: data.answer, sources: data.sources, reproducibility: data.reproducibility }
           ]
           newSessions[idx] = updatedSession
         }
@@ -920,6 +956,11 @@ function App() {
                                       {/* Retrieval Inspector */}
                                       {msg.sources && msg.sources.length > 0 && (
                                          <RetrievalInspector query={activeSession!.messages[msgIdx - 1]?.content || ''} sources={msg.sources} />
+                                      )}
+
+                                      {/* Reproducibility Inspector */}
+                                      {msg.reproducibility && (
+                                         <ReproducibilityInspector info={msg.reproducibility} />
                                       )}
 
                                      {/* Sources Block */}

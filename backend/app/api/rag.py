@@ -1,5 +1,6 @@
+import hashlib
 from fastapi import APIRouter, HTTPException, status
-from app.schemas import RetrievalRequest, RAGResponse, RetrievalResult
+from app.schemas import RetrievalRequest, RAGResponse, RetrievalResult, ReproducibilityInfo
 from app.services.retrieval import search_chunks, RetrievalError
 from app.services.generation import generate_text, GenerationError
 from app.services.activity_log import log_activity
@@ -115,6 +116,7 @@ async def ask_question(request: RetrievalRequest):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Unexpected generation error: {str(e)}")
 
     # 6. Return response
+    prompt_hash = hashlib.sha256(prompt.encode('utf-8')).hexdigest()
     
     try:
         log_activity(
@@ -124,13 +126,21 @@ async def ask_question(request: RetrievalRequest):
                 "query": request.query,
                 "top_k": request.top_k,
                 "selected_source_count": len(sources),
-                "answer_generated": True
+                "answer_generated": True,
+                "prompt_hash": prompt_hash
             }
         )
     except Exception as e:
         print(f"Audit log failed: {e}")
+
+    reproducibility = ReproducibilityInfo(
+        prompt=prompt,
+        model=settings.GENERATION_MODEL,
+        temperature=0.0
+    )
         
     return RAGResponse(
         answer=answer,
-        sources=sources
+        sources=sources,
+        reproducibility=reproducibility
     )
