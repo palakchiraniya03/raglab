@@ -61,7 +61,29 @@ async def ask_question(request: RetrievalRequest):
     context_string = "\n".join(context_parts)
 
     # 4. Build prompt
-    prompt = f"""
+    if request.operation == "compare":
+        prompt = f"""
+    Compare the information from the provided document context.
+
+    Context:
+    {context_string}
+
+    Topic to compare:
+    {request.query}
+
+    Instructions:
+    - Use the context as the source of truth.
+    - Explicitly compare information from the different source documents.
+    - Highlight important similarities and differences when the context supports them.
+    - Identify which source document supports each important point.
+    - Do not use outside knowledge or invent information.
+    - If the provided context does not contain enough information for a meaningful comparison, clearly state that.
+    - Keep the answer concise.
+
+    Answer:
+    """
+    else:
+        prompt = f"""
     Answer the user's question using the provided document context.
 
     Context:

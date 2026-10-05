@@ -43,6 +43,7 @@ interface ChatMessage {
   role: "user" | "assistant"
   content: string
   sources?: RetrievalResult[]
+  operation?: 'ask' | 'compare'
 }
 
 interface ChatSession {
@@ -492,6 +493,7 @@ function App() {
   const [question, setQuestion] = useState('')
   const [asking, setAsking] = useState(false)
   const [askError, setAskError] = useState<string | null>(null)
+  const [operation, setOperation] = useState<'ask' | 'compare'>('ask')
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -653,7 +655,7 @@ function App() {
           id: finalSessionId,
           title: generateTitle(currentQuery),
           createdAt: Date.now(),
-          messages: [{ role: "user", content: currentQuery }]
+          messages: [{ role: "user", content: currentQuery, operation }]
         }
         return [newSession, ...prev]
       } else {
@@ -662,7 +664,7 @@ function App() {
         if (updatedSession.messages.length === 0) {
           updatedSession.title = generateTitle(currentQuery)
         }
-        updatedSession.messages = [...updatedSession.messages, { role: "user", content: currentQuery }]
+        updatedSession.messages = [...updatedSession.messages, { role: "user", content: currentQuery, operation }]
         newSessions[idx] = updatedSession
         return newSessions
       }
@@ -672,7 +674,7 @@ function App() {
       const res = await fetch('http://localhost:8000/api/rag/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: currentQuery, top_k: 5 })
+        body: JSON.stringify({ query: currentQuery, top_k: 5, operation })
       })
 
       if (!res.ok) {
@@ -896,6 +898,9 @@ function App() {
                                 <div key={msgIdx} className="flex justify-end mt-4">
                                    <div className="bg-[#2f2f2f] px-5 py-3.5 rounded-3xl max-w-[85%] text-[15px] text-gray-100 whitespace-pre-wrap">
                                       {msg.content}
+                                      {msg.operation === 'compare' && (
+                                         <span className="inline-block text-[10px] bg-[#404040] text-gray-300 px-2 py-0.5 rounded-full ml-2 uppercase tracking-wide align-middle">Compare</span>
+                                      )}
                                    </div>
                                 </div>
                               )
@@ -959,6 +964,21 @@ function App() {
                         <span>{askError}</span>
                      </div>
                    )}
+
+                   <div className="flex gap-2 mb-3">
+                     <button 
+                       onClick={() => setOperation('ask')}
+                       className={`px-3 py-1.5 rounded-full text-[12px] font-medium transition-colors ${operation === 'ask' ? 'bg-[#404040] text-white' : 'text-gray-400 hover:text-gray-200 hover:bg-[#303030]'}`}
+                     >
+                        Ask
+                     </button>
+                     <button 
+                       onClick={() => setOperation('compare')}
+                       className={`px-3 py-1.5 rounded-full text-[12px] font-medium transition-colors ${operation === 'compare' ? 'bg-[#404040] text-white' : 'text-gray-400 hover:text-gray-200 hover:bg-[#303030]'}`}
+                     >
+                        Compare
+                     </button>
+                   </div>
 
                    <div className="relative flex items-end bg-[#2f2f2f] rounded-[24px] focus-within:ring-1 ring-gray-400 shadow-md">
                       <input

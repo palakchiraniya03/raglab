@@ -122,6 +122,48 @@ def test_rag_cross_document_context_building(mock_search_chunks, mock_generate_t
 
 @patch("app.api.rag.generate_text", new_callable=AsyncMock)
 @patch("app.api.rag.search_chunks", new_callable=AsyncMock)
+def test_rag_compare_operation(mock_search_chunks, mock_generate_text):
+    mock_search_chunks.return_value = [
+        {
+            "text": "A virus is not a living organism.",
+            "score": 0.95,
+            "metadata": {"document_id": "doc_1", "filename": "biology.txt", "file_type": "txt", "page": None, "chunk_index": 0, "char_start": 0, "char_end": 30}
+        },
+        {
+            "text": "A virus is a complex living organism.",
+            "score": 0.90,
+            "metadata": {"document_id": "doc_2", "filename": "alt_science.txt", "file_type": "txt", "page": 1, "chunk_index": 0, "char_start": 0, "char_end": 39}
+        }
+    ]
+
+    mock_generate_text.return_value = "biology.txt says a virus is not living, while alt_science.txt says it is."
+
+    response = client.post(
+        "/api/rag/ask",
+        json={"query": "Is a virus living?", "operation": "compare"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["sources"]) == 2
+
+    prompt = mock_generate_text.call_args[1]["prompt"]
+    
+    assert "[Source 1]" in prompt
+    assert "biology.txt" in prompt
+    assert "[Source 2]" in prompt
+    assert "alt_science.txt" in prompt
+    
+    # Verify compare specific instructions
+    assert "Compare the information from the provided document context." in prompt
+    assert "Explicitly compare information from the different source documents." in prompt
+    assert "Topic to compare:" in prompt
+    
+    # Verify it does NOT contain standard QA instructions
+    assert "For conceptual/definition questions" not in prompt
+
+@patch("app.api.rag.generate_text", new_callable=AsyncMock)
+@patch("app.api.rag.search_chunks", new_callable=AsyncMock)
 def test_rag_no_context(mock_search_chunks, mock_generate_text):
     mock_search_chunks.return_value = []
 
