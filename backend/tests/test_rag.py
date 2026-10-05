@@ -70,8 +70,55 @@ def test_rag_success(mock_search_chunks, mock_generate_text):
     assert "What is the Laplacian matrix?" in prompt
     assert "using the provided document context" in prompt
 
+@patch("app.api.rag.generate_text", new_callable=AsyncMock)
+@patch("app.api.rag.search_chunks", new_callable=AsyncMock)
+def test_rag_cross_document_context_building(mock_search_chunks, mock_generate_text):
+    mock_search_chunks.return_value = [
+        {
+            "text": "The CEO of RAGLab is Jane Doe.",
+            "score": 0.95,
+            "metadata": {"document_id": "doc_1", "filename": "ceo_info.txt", "file_type": "txt", "page": None, "chunk_index": 0, "char_start": 0, "char_end": 30}
+        },
+        {
+            "text": "Jane Doe's favorite language is Python.",
+            "score": 0.90,
+            "metadata": {"document_id": "doc_2", "filename": "personal.txt", "file_type": "txt", "page": 1, "chunk_index": 0, "char_start": 0, "char_end": 39}
+        },
+        {
+            "text": "RAGLab uses FastAPI.",
+            "score": 0.85,
+            "metadata": {"document_id": "doc_3", "filename": "tech.md", "file_type": "md", "page": None, "chunk_index": 0, "char_start": 0, "char_end": 20}
+        }
+    ]
 
+    mock_generate_text.return_value = "Jane Doe's favorite programming language is Python."
 
+    response = client.post(
+        "/api/rag/ask",
+        json={"query": "What is the favorite programming language of RAGLab's CEO?", "top_k": 3}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["sources"]) == 3
+
+    prompt = mock_generate_text.call_args[1]["prompt"]
+    
+    # Verify all three chunks are in the generation prompt
+    assert "[Source 1]" in prompt
+    assert "ceo_info.txt" in prompt
+    assert "The CEO of RAGLab is Jane Doe." in prompt
+    
+    assert "[Source 2]" in prompt
+    assert "personal.txt" in prompt
+    assert "Page: 1" in prompt
+    assert "Jane Doe's favorite language is Python." in prompt
+    
+    assert "[Source 3]" in prompt
+    assert "tech.md" in prompt
+    
+    # Verify new instruction is present
+    assert "Synthesize information from multiple sources if the question requires it." in prompt
 
 @patch("app.api.rag.generate_text", new_callable=AsyncMock)
 @patch("app.api.rag.search_chunks", new_callable=AsyncMock)

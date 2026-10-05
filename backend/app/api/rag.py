@@ -72,6 +72,7 @@ async def ask_question(request: RetrievalRequest):
 
     Instructions:
     - Use the context as the source of truth.
+    - Synthesize information from multiple sources if the question requires it.
     - For conceptual/definition questions, answer with the conceptual definition from the document, not an implementation function or code snippet.
     - If the context contains both a prose definition and implementation code, prefer the prose definition unless explicitly asked for code.
     - Include the important defining details explicitly stated in the context, such as formulas/values (e.g., 1 and 0), named terminology (e.g., Fiedler Value), minimum/maximum conditions, and relevant start/target concepts.
