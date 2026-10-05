@@ -177,3 +177,37 @@ def delete_document(document_id: str) -> None:
         )
     except Exception as e:
         raise VectorStorageError(f"Failed to delete document: {str(e)}")
+
+def get_document_chunks(document_id: str) -> List[Dict[str, Any]]:
+    """Retrieve all chunks for a specific document, ordered by chunk_index."""
+    try:
+        collections = client.get_collections().collections
+        if not any(c.name == settings.QDRANT_COLLECTION for c in collections):
+            return []
+
+        chunks = []
+        offset = None
+        while True:
+            records, next_page_offset = client.scroll(
+                collection_name=settings.QDRANT_COLLECTION,
+                scroll_filter=Filter(
+                    must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))]
+                ),
+                limit=1000,
+                offset=offset,
+                with_payload=True,
+                with_vectors=False
+            )
+            for record in records:
+                if record.payload:
+                    chunks.append(record.payload)
+
+            if next_page_offset is None:
+                break
+            offset = next_page_offset
+
+        # Sort chunks by chunk_index to ensure deterministic ordering
+        chunks.sort(key=lambda x: x.get("chunk_index", 0))
+        return chunks
+    except Exception as e:
+        raise VectorStorageError(f"Failed to get document chunks: {str(e)}")

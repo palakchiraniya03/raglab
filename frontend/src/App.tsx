@@ -21,6 +21,21 @@ interface DocumentItem {
   chunk_count: number
 }
 
+interface ChunkMetadata {
+  document_id: string
+  filename: string
+  file_type: string
+  page: number | null
+  chunk_index: number
+  char_start: number
+  char_end: number
+}
+
+interface ChunkResponse {
+  text: string
+  metadata: ChunkMetadata
+}
+
 interface RetrievalResult {
   text: string
   score: number
@@ -591,6 +606,119 @@ function ReproducibilityInspector({ info }: { info: ReproducibilityInfo }) {
   )
 }
 
+interface KnowledgeBaseExplorerProps {
+  documents: DocumentItem[]
+  documentsLoading: boolean
+  selectedDocumentId: string | null
+  setSelectedDocumentId: (id: string | null) => void
+  documentChunks: ChunkResponse[]
+  chunksLoading: boolean
+  chunksError: string | null
+}
+
+function KnowledgeBaseExplorer({
+  documents,
+  documentsLoading,
+  selectedDocumentId,
+  setSelectedDocumentId,
+  documentChunks,
+  chunksLoading,
+  chunksError
+}: KnowledgeBaseExplorerProps) {
+  const selectedDoc = documents.find(d => d.document_id === selectedDocumentId)
+
+  return (
+    <div className="flex-1 overflow-y-auto w-full h-full p-4 md:p-8 animate-in fade-in duration-300">
+      <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-6 h-full">
+        {/* Document List */}
+        <div className="w-full md:w-1/3 flex flex-col gap-4">
+          <h2 className="text-xl font-semibold text-gray-200">Documents</h2>
+          <div className="bg-[#262626] border border-white/5 rounded-xl overflow-hidden flex-1 flex flex-col max-h-[calc(100vh-8rem)]">
+            <div className="overflow-y-auto flex-1">
+              {documentsLoading && documents.length === 0 ? (
+                <div className="p-6 text-center text-gray-500 text-sm flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading documents...
+                </div>
+              ) : documents.length === 0 ? (
+                <div className="p-6 text-center text-gray-500 text-sm">
+                  No documents in the knowledge base.
+                </div>
+              ) : (
+                <div className="flex flex-col">
+                  {documents.map((doc, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedDocumentId(doc.document_id)}
+                      className={`text-left p-4 border-b border-white/5 last:border-0 hover:bg-[#303030] transition-colors flex flex-col gap-1.5 cursor-pointer ${selectedDocumentId === doc.document_id ? 'bg-[#303030]' : ''}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-gray-400 shrink-0" />
+                        <span className="text-[14px] text-gray-200 font-medium truncate">{doc.filename}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-gray-500 pl-6">
+                        <span className="uppercase">{doc.file_type}</span>
+                        <span className="flex items-center gap-1"><CheckCircle className="w-3 h-3 text-emerald-500/80"/> {doc.chunk_count} chunks</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Chunks View */}
+        <div className="w-full md:w-2/3 flex flex-col gap-4">
+          <h2 className="text-xl font-semibold text-gray-200">
+            {selectedDoc ? `Chunks for ${selectedDoc.filename}` : 'Chunk Inspector'}
+          </h2>
+          <div className="bg-[#262626] border border-white/5 rounded-xl overflow-hidden flex-1 flex flex-col max-h-[calc(100vh-8rem)]">
+            <div className="overflow-y-auto flex-1 p-4 md:p-6">
+              {!selectedDocumentId ? (
+                <div className="h-full flex flex-col items-center justify-center text-gray-500 text-sm h-64">
+                  <Database className="w-8 h-8 mb-3 opacity-20" />
+                  Select a document to inspect its chunks
+                </div>
+              ) : chunksLoading ? (
+                <div className="h-full flex flex-col items-center justify-center text-gray-500 text-sm gap-3 h-64">
+                  <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                  Fetching chunks...
+                </div>
+              ) : chunksError ? (
+                <div className="p-4 bg-red-900/20 border border-red-900/30 rounded-xl text-red-400 text-sm flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  {chunksError}
+                </div>
+              ) : documentChunks.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-gray-500 text-sm h-64">
+                  No chunks found for this document.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {documentChunks.map((chunk, idx) => (
+                    <div key={idx} className="bg-[#212121] border border-white/10 rounded-xl p-4 flex flex-col gap-3">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500 border-b border-white/5 pb-3">
+                        <span className="font-medium text-gray-300">
+                          Chunk {chunk.metadata.chunk_index}
+                        </span>
+                        {chunk.metadata.page !== null && chunk.metadata.page !== undefined && <span>Page {chunk.metadata.page}</span>}
+                        <span>Chars {chunk.metadata.char_start}-{chunk.metadata.char_end}</span>
+                      </div>
+                      <div className="text-gray-300 text-[13.5px] leading-[1.7] whitespace-pre-wrap break-words">
+                        {chunk.text}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const [backendStatus, setBackendStatus] = useState<string>('checking...')
 
@@ -605,8 +733,39 @@ function App() {
   // Chat state
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
-  const [activeView, setActiveView] = useState<'chat' | 'evaluation'>('chat')
+  const [activeView, setActiveView] = useState<'chat' | 'evaluation' | 'knowledge'>('chat')
   const [sessionsLoaded, setSessionsLoaded] = useState(false)
+  
+  // Knowledge Base Explorer state
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null)
+  const [documentChunks, setDocumentChunks] = useState<ChunkResponse[]>([])
+  const [chunksLoading, setChunksLoading] = useState(false)
+  const [chunksError, setChunksError] = useState<string | null>(null)
+
+  const fetchDocumentChunks = async (documentId: string) => {
+    setChunksLoading(true)
+    setChunksError(null)
+    try {
+      const res = await fetch(`http://localhost:8000/api/documents/${documentId}/chunks`)
+      if (!res.ok) {
+        throw new Error('Failed to fetch chunks')
+      }
+      const data = await res.json()
+      setDocumentChunks(data)
+    } catch (err: any) {
+      setChunksError(err.message)
+    } finally {
+      setChunksLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (selectedDocumentId) {
+      fetchDocumentChunks(selectedDocumentId)
+    } else {
+      setDocumentChunks([])
+    }
+  }, [selectedDocumentId])
 
   const [question, setQuestion] = useState('')
   const [asking, setAsking] = useState(false)
@@ -858,6 +1017,13 @@ function App() {
                 <BarChart2 className="w-4 h-4" />
                 <span className="text-[14px] font-medium">Evaluation</span>
              </button>
+             <button
+               onClick={() => setActiveView('knowledge')}
+               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors cursor-pointer w-full ${activeView === 'knowledge' ? 'bg-[#2f2f2f] border-white/10 text-gray-200' : 'border-transparent text-gray-400 hover:bg-[#212121] hover:text-gray-300'}`}
+             >
+                <Database className="w-4 h-4" />
+                <span className="text-[14px] font-medium">Knowledge Base</span>
+             </button>
            </div>
 
            {/* Chats List */}
@@ -991,6 +1157,16 @@ function App() {
       <main className="flex-1 flex flex-col min-w-0 bg-[#212121] relative h-full">
         {activeView === 'evaluation' ? (
           <EvaluationDashboard />
+        ) : activeView === 'knowledge' ? (
+          <KnowledgeBaseExplorer
+            documents={documents}
+            documentsLoading={documentsLoading}
+            selectedDocumentId={selectedDocumentId}
+            setSelectedDocumentId={setSelectedDocumentId}
+            documentChunks={documentChunks}
+            chunksLoading={chunksLoading}
+            chunksError={chunksError}
+          />
         ) : (
           <>
              <div className="flex-1 overflow-y-auto">

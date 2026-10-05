@@ -244,3 +244,35 @@ async def delete_indexed_document(document_id: str):
         }
     except VectorStorageError as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+from app.services.vector_storage import get_document_chunks
+
+@router.get("/{document_id}/chunks", response_model=list[ChunkResponse])
+async def list_document_chunks(document_id: str):
+    try:
+        existing_doc = get_document_info(document_id)
+        if not existing_doc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+            
+        chunks = get_document_chunks(document_id)
+        
+        response_chunks = []
+        for chunk in chunks:
+            # Reconstruct ChunkMetadata from payload
+            metadata = ChunkMetadata(
+                document_id=chunk.get("document_id", ""),
+                filename=chunk.get("filename", ""),
+                file_type=chunk.get("file_type", ""),
+                page=chunk.get("page"),
+                chunk_index=chunk.get("chunk_index", 0),
+                char_start=chunk.get("char_start", 0),
+                char_end=chunk.get("char_end", 0)
+            )
+            response_chunks.append(ChunkResponse(
+                text=chunk.get("text", ""),
+                metadata=metadata
+            ))
+            
+        return response_chunks
+    except VectorStorageError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
