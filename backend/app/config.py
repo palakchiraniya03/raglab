@@ -4,7 +4,7 @@ from typing import List
 class Settings(BaseSettings):
     PROJECT_NAME: str = "RAGLab"
     API_PREFIX: str = "/api"
-    CORS_ORIGINS: List[str] = ["http://localhost:5173"]
+    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
     
     # Phase 3 Configuration
     OLLAMA_BASE_URL: str = "http://localhost:11434"

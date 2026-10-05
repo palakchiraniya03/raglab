@@ -6,13 +6,40 @@ import re
 import asyncio
 from fastapi import HTTPException
 from app.api.rag import ask_question
-from app.schemas import RetrievalRequest, EvaluationResponse, EvaluationSummary, EvaluationCaseResult
+from app.schemas import RetrievalRequest, EvaluationResponse, EvaluationSummary, EvaluationCaseResult, ChunkEvalInfo
 
 EVALUATION_CASE_TIMEOUT_SECONDS = 30
 
 def normalize_text(text: str) -> str:
     text = unicodedata.normalize('NFKC', text).lower().strip()
     return re.sub(r'\s+', ' ', text)
+
+def is_chunk_relevant(chunk_text: str, q: dict) -> bool:
+    norm_text = normalize_text(chunk_text)
+    expected_terms = q.get('expected_terms', [])
+    acceptable_terms = q.get('acceptable_terms', {})
+    
+    if not expected_terms:
+        return False
+        
+    multi_word_terms = [t for t in expected_terms if ' ' in t.strip()]
+    
+    found_any_multi = False
+    found_any_single = False
+    
+    for term in expected_terms:
+        alts = [term] + acceptable_terms.get(term, [])
+        is_found = any(normalize_text(alt) in norm_text for alt in alts)
+        
+        if is_found:
+            if ' ' in term.strip():
+                found_any_multi = True
+            else:
+                found_any_single = True
+                
+    if multi_word_terms:
+        return found_any_multi
+    return found_any_single
 
 async def run_evaluation() -> EvaluationResponse:
     questions_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'evaluation', 'questions.json')
@@ -25,11 +52,16 @@ async def run_evaluation() -> EvaluationResponse:
     expected_terms_found_count = 0
     sources_found_count = 0
     total_latency = 0.0
+    
+    sum_precision = 0.0
+    sum_mrr = 0.0
+    total_retrieval_hits = 0
 
     results = []
 
     for q in questions:
         start_time = time.time()
+        reproducibility = None
 
         try:
             req = RetrievalRequest(query=q['question'], top_k=5)
@@ -39,6 +71,7 @@ async def run_evaluation() -> EvaluationResponse:
             )
             answer = res_data.answer
             sources = res_data.sources
+            reproducibility = res_data.reproducibility
         except asyncio.TimeoutError:
             answer = "Evaluation timed out after 30 seconds."
             sources = []
@@ -61,6 +94,11 @@ async def run_evaluation() -> EvaluationResponse:
         answer_passed = False
         sources_passed = False
         diagnosis = "Pass"
+        
+        retrieval_hit = None
+        precision_at_k = None
+        mrr = None
+        retrieved_chunks_info = None
 
         if q['answerable']:
             answerable_count += 1
@@ -92,6 +130,34 @@ async def run_evaluation() -> EvaluationResponse:
                     diagnosis = "Likely generation failure"
                 else:
                     diagnosis = "Likely retrieval failure"
+                    
+            # Calculate chunk-level metrics
+            retrieved_chunks_info = []
+            first_hit_rank = -1
+            hit_count = 0
+            
+            for rank_idx, chunk in enumerate(sources):
+                is_rel = is_chunk_relevant(chunk.text, q)
+                if is_rel:
+                    hit_count += 1
+                    if first_hit_rank == -1:
+                        first_hit_rank = rank_idx + 1
+                        
+                retrieved_chunks_info.append(ChunkEvalInfo(
+                    rank=rank_idx + 1,
+                    filename=chunk.metadata.get("filename", "unknown"),
+                    metadata=chunk.metadata,
+                    is_relevant=is_rel
+                ))
+            
+            retrieval_hit = hit_count > 0
+            precision_at_k = float(hit_count) / sources_count if sources_count > 0 else 0.0
+            mrr = 1.0 / first_hit_rank if first_hit_rank > 0 else 0.0
+            
+            if retrieval_hit:
+                total_retrieval_hits += 1
+            sum_precision += precision_at_k
+            sum_mrr += mrr
         else:
             unanswerable_count += 1
             unanswerable_indicators = ['not available', 'don\'t know', 'do not know', 'sorry', 'cannot answer', 'not mention', 'no information']
@@ -106,6 +172,7 @@ async def run_evaluation() -> EvaluationResponse:
 
         results.append(EvaluationCaseResult(
             id=q['id'],
+            category=q.get('category', 'unknown'),
             question=q['question'],
             answerable=q['answerable'],
             answer=answer,
@@ -117,11 +184,20 @@ async def run_evaluation() -> EvaluationResponse:
             answer_passed=answer_passed,
             sources_passed=sources_passed,
             latency=latency,
-            diagnosis=diagnosis
+            diagnosis=diagnosis,
+            retrieval_hit=retrieval_hit,
+            precision_at_k=precision_at_k,
+            mrr=mrr,
+            reproducibility=reproducibility,
+            retrieved_chunks_info=retrieved_chunks_info
         ))
 
     avg_latency = total_latency / total if total > 0 else 0
     refusal_success_count = sum(1 for r in results if not r.answerable and r.answer_passed)
+    
+    avg_precision = sum_precision / answerable_count if answerable_count > 0 else 0.0
+    avg_mrr = sum_mrr / answerable_count if answerable_count > 0 else 0.0
+    hit_rate = float(total_retrieval_hits) / answerable_count if answerable_count > 0 else 0.0
 
     summary = EvaluationSummary(
         total_questions=total,
@@ -130,7 +206,10 @@ async def run_evaluation() -> EvaluationResponse:
         retrieval_success_count=sources_found_count,
         answer_term_pass_count=expected_terms_found_count,
         refusal_success_count=refusal_success_count,
-        average_latency=avg_latency
+        average_latency=avg_latency,
+        avg_precision_at_k=avg_precision,
+        avg_mrr=avg_mrr,
+        retrieval_hit_rate=hit_rate
     )
 
     return EvaluationResponse(summary=summary, results=results)

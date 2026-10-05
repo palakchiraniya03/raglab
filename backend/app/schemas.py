@@ -67,8 +67,15 @@ class RAGResponse(BaseModel):
     reproducibility: Optional[ReproducibilityInfo] = None
 
 
+class ChunkEvalInfo(BaseModel):
+    rank: int
+    filename: str
+    metadata: dict
+    is_relevant: bool
+
 class EvaluationCaseResult(BaseModel):
     id: str
+    category: str
     question: str
     answerable: bool
     answer: str
@@ -81,6 +88,11 @@ class EvaluationCaseResult(BaseModel):
     sources_passed: bool
     latency: float
     diagnosis: str
+    retrieval_hit: Optional[bool] = None
+    precision_at_k: Optional[float] = None
+    mrr: Optional[float] = None
+    reproducibility: Optional[ReproducibilityInfo] = None
+    retrieved_chunks_info: Optional[List[ChunkEvalInfo]] = None
 
 class EvaluationSummary(BaseModel):
     total_questions: int
@@ -90,6 +102,9 @@ class EvaluationSummary(BaseModel):
     answer_term_pass_count: int
     refusal_success_count: int
     average_latency: float
+    avg_precision_at_k: float = 0.0
+    avg_mrr: float = 0.0
+    retrieval_hit_rate: float = 0.0
 
 class EvaluationResponse(BaseModel):
     summary: EvaluationSummary

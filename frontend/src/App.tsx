@@ -66,8 +66,16 @@ interface RAGResponse {
   reproducibility?: ReproducibilityInfo
 }
 
+interface ChunkEvalInfo {
+  rank: number
+  filename: string
+  metadata: any
+  is_relevant: boolean
+}
+
 interface EvaluationCaseResult {
   id: string
+  category: string
   question: string
   answerable: boolean
   answer: string
@@ -80,6 +88,11 @@ interface EvaluationCaseResult {
   sources_passed: boolean
   latency: number
   diagnosis: string
+  retrieval_hit?: boolean
+  precision_at_k?: number
+  mrr?: number
+  reproducibility?: ReproducibilityInfo
+  retrieved_chunks_info?: ChunkEvalInfo[]
 }
 
 interface EvaluationSummary {
@@ -90,6 +103,9 @@ interface EvaluationSummary {
   answer_term_pass_count: number
   refusal_success_count: number
   average_latency: number
+  avg_precision_at_k: number
+  avg_mrr: number
+  retrieval_hit_rate: number
 }
 
 interface EvaluationResponse {

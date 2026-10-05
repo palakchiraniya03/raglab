@@ -95,3 +95,72 @@ def test_evaluation_timeout(monkeypatch):
         assert res["answer"] == "Evaluation timed out after 30 seconds."
         assert res["sources_count"] == 0
         assert res["has_sources"] == False
+        if res["answerable"]:
+            assert res["retrieval_hit"] == False
+            assert res["precision_at_k"] == 0.0
+            assert res["mrr"] == 0.0
+
+def test_is_chunk_relevant():
+    from app.services.evaluation import is_chunk_relevant
+    
+    q1 = {
+        "expected_terms": ["adjacency matrix", "1", "0"]
+    }
+    # Has main conceptual term
+    assert is_chunk_relevant("The adjacency matrix is nice.", q1) == True
+    # Has only supporting term, no main conceptual term
+    assert is_chunk_relevant("1 and 0", q1) == False
+    
+    q2 = {
+        "expected_terms": ["BFS", "Queue"]
+    }
+    # No multi-word terms. Any single term works.
+    assert is_chunk_relevant("We use a Queue here.", q2) == True
+    assert is_chunk_relevant("We use BFS.", q2) == True
+    assert is_chunk_relevant("Stack", q2) == False
+    
+    q3 = {
+        "expected_terms": ["shortest path length", "minimum", "distance"],
+        "acceptable_terms": {
+            "distance": ["minimum number of edges"]
+        }
+    }
+    # Primary term (shortest path length) missing
+    assert is_chunk_relevant("This is the shortest path length.", q3) == True
+    # If acceptable term for a single word is present, wait... the logic says:
+    # if multi_word_terms: return found_any_multi
+    # Because q3 has "shortest path length", it requires that term to be found!
+    assert is_chunk_relevant("This is the minimum distance.", q3) == False
+
+def test_chunk_level_metrics(monkeypatch):
+    from app.schemas import RAGResponse, RetrievalResult
+    from app.api.rag import ask_question
+
+    async def mock_ask_question(req):
+        if "adjacency matrix" in req.query.lower():
+            return RAGResponse(
+                answer="dummy",
+                sources=[
+                    RetrievalResult(text="Just some text 1 0.", score=0.9, metadata={"filename": "test.pdf"}), # Irrelevant
+                    RetrievalResult(text="The adjacency matrix is...", score=0.8, metadata={"filename": "test.pdf"}), # Relevant
+                    RetrievalResult(text="Another adjacency matrix...", score=0.7, metadata={"filename": "test.pdf"}) # Relevant
+                ]
+            )
+        return RAGResponse(answer="dummy", sources=[])
+
+    monkeypatch.setattr('app.services.evaluation.ask_question', mock_ask_question)
+    response = client.post("/api/evaluation/run")
+    assert response.status_code == 200
+    results = {r["id"]: r for r in response.json()["results"]}
+    
+    q01 = results["q01"]
+    assert q01["retrieval_hit"] == True
+    assert q01["precision_at_k"] == 2 / 3
+    assert q01["mrr"] == 0.5
+    
+    chunks = q01["retrieved_chunks_info"]
+    assert len(chunks) == 3
+    assert chunks[0]["is_relevant"] == False
+    assert chunks[1]["is_relevant"] == True
+    assert chunks[2]["is_relevant"] == True
+

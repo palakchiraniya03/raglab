@@ -1,6 +1,7 @@
 [
   {
     "id": "q01",
+    "category": "conceptual definition",
     "question": "What is an adjacency matrix?",
     "expected_answer": "The adjacency matrix A is defined by A_i,j = 1 if (v_i, v_j) belongs to E, and 0 otherwise.",
     "expected_terms": [
@@ -12,6 +13,7 @@
   },
   {
     "id": "q02",
+    "category": "conceptual definition",
     "question": "What is a degree matrix?",
     "expected_answer": "The degree matrix D is a diagonal matrix where D_i,i = deg(v_i).",
     "expected_terms": [
@@ -23,6 +25,7 @@
   },
   {
     "id": "q03",
+    "category": "mathematical concept",
     "question": "What is the unnormalized Laplacian matrix?",
     "expected_answer": "The unnormalized Laplacian matrix L is defined as L = D - A.",
     "expected_terms": [
@@ -35,6 +38,7 @@
   },
   {
     "id": "q04",
+    "category": "mathematical concept",
     "question": "What is the normalized Laplacian matrix?",
     "expected_answer": "The normalized Laplacian matrix L_N is defined as L_N = D^(-1/2) L D^(-1/2) = I - D^(-1/2) A D^(-1/2).",
     "expected_terms": [
@@ -47,6 +51,7 @@
   },
   {
     "id": "q05",
+    "category": "mathematical concept",
     "question": "What is algebraic connectivity?",
     "expected_answer": "Algebraic connectivity (λ2) is the second smallest eigenvalue of the Laplacian matrix L, also called the Fiedler Value.",
     "expected_terms": [
@@ -58,6 +63,7 @@
   },
   {
     "id": "q06",
+    "category": "algorithm",
     "question": "What is Breadth-First Search (BFS)?",
     "expected_answer": "BFS explores nodes layer-by-layer (level-wise) starting from a source node using a Queue.",
     "expected_terms": [
@@ -70,6 +76,7 @@
   },
   {
     "id": "q07",
+    "category": "algorithm",
     "question": "What is Depth-First Search (DFS)?",
     "expected_answer": "DFS explores as deep as possible along each branch before backtracking using a Stack or Recursion.",
     "expected_terms": [
@@ -83,6 +90,7 @@
   },
   {
     "id": "q08",
+    "category": "graph theory",
     "question": "What is a shortest path?",
     "expected_answer": "A shortest path finds the sequence of edges with the minimum total cost or number of edges between a start node and target node.",
     "expected_terms": [
@@ -95,6 +103,7 @@
   },
   {
     "id": "q09",
+    "category": "graph theory",
     "question": "What is shortest path length?",
     "expected_answer": "Shortest path length calculates the minimum number of steps or distance between the source and target.",
     "expected_terms": [
@@ -113,6 +122,7 @@
   },
   {
     "id": "q10",
+    "category": "refusal",
     "question": "What is the capital of France?",
     "expected_answer": "The information is not available in the provided document.",
     "expected_terms": [],
