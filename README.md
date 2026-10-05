@@ -20,10 +20,14 @@ RAGLab is designed to run locally without requiring a cloud LLM or hosted vector
 - ⚡ Lexical relevance boosting alongside semantic similarity
 - 🤖 Local answer generation using **Ollama + Gemma 3 1B**
 - 💬 ChatGPT-style document question-answering interface
-- 📚 Persistent local knowledge base
+- 📚 Persistent multi-document knowledge base
+- 🔁 Duplicate document detection using SHA-256 document IDs
+- 🗑️ Document deletion and knowledge-base management
 - 🔍 Retrieval Inspector for understanding which chunks were selected
-- 📑 Source citations and relevant source passages
-- 🧪 Lightweight RAG evaluation workflow
+- 📑 Numbered source evidence with relevant source passages
+- 🧪 Evaluation dashboard with retrieval, answer, refusal, and latency metrics
+- 🛡️ Tamper-evident hash-chained activity audit trail
+- 💾 Persistent local chat history
 - 🔬 Experiments with retrieval `top_k` and document chunk size
 - 📴 Fully local/offline AI pipeline after model setup
 
@@ -192,12 +196,31 @@ The information is not available in the provided documents.
 
 ---
 
-## Retrieval Inspector
+## Evidence and Retrieval Inspector
 
-RAGLab exposes the retrieval process instead of hiding it.
+RAGLab exposes retrieved evidence instead of hiding the retrieval process behind the generated answer.
 
-For retrieved chunks, the frontend can show information such as:
+### Source evidence
 
+Each answer can display numbered source entries containing:
+
+- source document
+- page number when available
+- chunk index
+- retrieval score
+- relevant passage from the retrieved chunk
+
+Source numbering is generated structurally from the retrieved results in the frontend. The language model is not asked to invent or generate citation numbers.
+
+This provides a direct connection between the generated answer and the document evidence used to produce it.
+
+### Retrieval Inspector
+
+RAGLab also provides a technical retrieval inspector for understanding why particular chunks were selected.
+
+For retrieved chunks, the inspector can show:
+
+- query
 - source document
 - page
 - chunk index
@@ -207,8 +230,7 @@ For retrieved chunks, the frontend can show information such as:
 - relevance threshold
 - whether the chunk was selected
 
-This makes it possible to inspect **why particular document passages were provided to the generator**.
-
+This makes it possible to inspect **how retrieval decisions were made before the context was passed to the generator**.
 ---
 
 ## Persistent Knowledge Base
@@ -217,15 +239,52 @@ RAGLab uses local persistent Qdrant storage.
 
 This means indexed documents remain available after restarting the backend.
 
+The knowledge base supports multiple documents simultaneously. Retrieval can search across the complete collection or optionally be restricted to a specific document.
+
 Documents are identified using a SHA-256 hash of their contents, allowing duplicate uploads to be detected without unnecessarily re-embedding the same document.
+
+The knowledge base also supports document management operations such as:
+
+- listing indexed documents
+- displaying document and chunk information
+- detecting duplicate uploads
+- deleting individual documents and their associated vectors
+
+This allows the knowledge base to be maintained throughout the document lifecycle rather than treating ingestion as a one-time operation.
+---
+## Tamper-Evident Audit Trail
+
+RAGLab maintains a local activity log for important knowledge-base and RAG operations.
+
+The audit trail uses a hash-chained JSONL format. Each event stores:
+
+- timestamp
+- event type
+- document ID when applicable
+- event details
+- previous event hash
+- current event hash
+
+Each event's SHA-256 hash is calculated from its canonicalized event contents, including the hash of the previous event. This creates a verifiable chain between consecutive events.
+
+Currently recorded operations include:
+
+- document indexing
+- duplicate document detection
+- document deletion
+- RAG queries
+
+The audit log can be independently verified to detect modifications to previously recorded events.
+
+Audit logging is deliberately isolated from the main workflow: an audit logging failure does not prevent the underlying document or RAG operation from completing.
 
 ---
 
 ## Evaluation
 
-RAGLab includes a small evaluation workflow based on questions derived from an actual source document.
+RAGLab includes an evaluation dashboard based on a fixed benchmark derived from an actual source document.
 
-The evaluation contains:
+The benchmark contains:
 
 - 9 answerable questions
 - 1 intentionally unanswerable question
@@ -237,13 +296,30 @@ The evaluation checks:
 - whether the system correctly refused an unsupported question
 - response latency
 
+The dashboard provides:
+
+- overall retrieval success
+- answer-term success
+- refusal success
+- average latency
+- per-question execution results
+- generated answer
+- expected terms
+- missing answer/source terms
+- source count
+- per-case diagnosis
+
+### Evaluation robustness
+
+Because generation runs locally through Ollama, individual evaluation cases can take longer than ordinary retrieval operations.
+
+The evaluation runner therefore applies a per-question timeout so that a stalled local generation cannot block the entire evaluation indefinitely.
+
 ### Observed result
 
-The evaluation demonstrated that relevant document chunks were successfully retrieved for all answerable questions.
+Evaluation experiments showed that relevant document chunks could be retrieved successfully even when the lightweight Gemma 3 1B model did not always reproduce all expected terms in its final answer.
 
-The main limitation observed was **local generation quality from the lightweight Gemma 3 1B model**, rather than document retrieval.
-
-This distinction was verified by checking whether the expected information was present in the retrieved source chunks.
+This distinction between **retrieval quality** and **generation quality** is explicitly surfaced in the evaluation diagnostics.
 
 ---
 

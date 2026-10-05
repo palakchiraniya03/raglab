@@ -71,3 +71,27 @@ def test_evaluation_run_endpoint(monkeypatch):
     # q09 should pass using alternative
     assert results["q09"]["answer_passed"] == True
     assert len(results["q09"]["missing_answer_terms"]) == 0
+
+def test_evaluation_timeout(monkeypatch):
+    from app.services import evaluation
+    monkeypatch.setattr(evaluation, 'EVALUATION_CASE_TIMEOUT_SECONDS', 0.01)
+
+    from app.schemas import RAGResponse
+    import asyncio
+
+    async def mock_ask_question_sleep(req):
+        await asyncio.sleep(0.05)
+        return RAGResponse(answer="Should not see this", sources=[])
+
+    monkeypatch.setattr('app.services.evaluation.ask_question', mock_ask_question_sleep)
+
+    response = client.post("/api/evaluation/run")
+    assert response.status_code == 200
+
+    data = response.json()
+    assert len(data["results"]) == 10
+
+    for res in data["results"]:
+        assert res["answer"] == "Evaluation timed out after 30 seconds."
+        assert res["sources_count"] == 0
+        assert res["has_sources"] == False

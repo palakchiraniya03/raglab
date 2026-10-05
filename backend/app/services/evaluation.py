@@ -3,9 +3,12 @@ import os
 import time
 import unicodedata
 import re
+import asyncio
 from fastapi import HTTPException
 from app.api.rag import ask_question
 from app.schemas import RetrievalRequest, EvaluationResponse, EvaluationSummary, EvaluationCaseResult
+
+EVALUATION_CASE_TIMEOUT_SECONDS = 30
 
 def normalize_text(text: str) -> str:
     text = unicodedata.normalize('NFKC', text).lower().strip()
@@ -30,9 +33,15 @@ async def run_evaluation() -> EvaluationResponse:
 
         try:
             req = RetrievalRequest(query=q['question'], top_k=5)
-            res_data = await ask_question(req)
+            res_data = await asyncio.wait_for(
+                ask_question(req),
+                timeout=EVALUATION_CASE_TIMEOUT_SECONDS
+            )
             answer = res_data.answer
             sources = res_data.sources
+        except asyncio.TimeoutError:
+            answer = "Evaluation timed out after 30 seconds."
+            sources = []
         except Exception as e:
             answer = f"Error: {str(e)}"
             sources = []
