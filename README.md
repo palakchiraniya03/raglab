@@ -365,7 +365,56 @@ was retained because it preserved relevant passages effectively for the tested d
 No unnecessary change was made to the production configuration based on this experiment.
 
 ---
+### Retrieval Parameter Tuning
 
+RAGLab exposes several retrieval parameters that control how candidate
+chunks are selected and passed to the generation model.
+
+| Parameter | Current Value | Purpose |
+|---|---:|---|
+| `top_k` | 5 | Number of candidate chunks initially retrieved from Qdrant |
+| `LEXICAL_BOOST_WEIGHT` | 0.07 | Small bonus for lexical overlap with the query |
+| `RETRIEVAL_SCORE_THRESHOLD` | 0.50 | Minimum final score required for a chunk to be retained |
+| `RAG_MAX_CONTEXT_CHUNKS` | 3 | Maximum number of selected chunks passed to the generation model |
+
+#### Lexical Boost Experiment
+
+We evaluated different lexical boost weights while keeping the
+knowledge base, embedding model, top-k, threshold, and relevance
+criteria fixed.
+
+| Lexical Weight | Retrieval Hit Rate | Precision@K | MRR |
+|---:|---:|---:|---:|
+| 0.00 | 100.0% | 0.741 | 1.000 |
+| 0.03 | 100.0% | 0.741 | 1.000 |
+| 0.05 | 100.0% | 0.741 | 1.000 |
+| 0.07 | 100.0% | 0.741 | 1.000 |
+| 0.10 | 100.0% | 0.778 | 1.000 |
+
+The experiment showed that retrieval remained stable across the tested
+weights. The current value of 0.07 is retained as a conservative
+lexical contribution so that semantic similarity remains the dominant
+retrieval signal. The experiment also showed that 0.10 improved
+Precision@K on this benchmark, demonstrating that the lexical weight
+is a tunable parameter rather than a universally optimal value.
+
+#### Context Size
+
+RAGLab initially retrieves up to 5 candidate chunks from Qdrant,
+filters and ranks them, and passes at most 3 selected chunks to the
+generation model. This provides enough context for multi-chunk and
+multi-document reasoning while limiting unnecessary context for the
+lightweight Gemma 3 1B model.
+
+#### Retrieval Threshold
+
+A final-score threshold of 0.50 is used to discard weak retrieval
+results before generation. This is an empirically chosen, tunable
+parameter rather than a universally optimal value. It also allows the
+system to refuse questions when no sufficiently relevant document
+evidence is found.
+
+---
 ## Project Structure
 
 ```text
