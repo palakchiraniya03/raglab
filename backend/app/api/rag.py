@@ -77,6 +77,7 @@ async def ask_question(request: RetrievalRequest):
     - Explicitly compare information from the different source documents.
     - Highlight important similarities and differences when the context supports them.
     - Identify which source document supports each important point.
+    - When answering, you MUST cite the specific sources using the format [Source N] at the end of each relevant sentence or claim. For example: "The matrix is diagonal [Source 1]." Do not hallucinate citations.
     - Do not use outside knowledge or invent information.
     - If the provided context does not contain enough information for a meaningful comparison, clearly state that.
     - Keep the answer concise.
@@ -96,6 +97,7 @@ async def ask_question(request: RetrievalRequest):
     Instructions:
     - Use the context as the source of truth.
     - Synthesize information from multiple sources if the question requires it.
+    - When answering, you MUST cite the specific sources used to support your claims using the format [Source N] at the end of each relevant sentence. For example: "The matrix is diagonal [Source 1]." Do not hallucinate citations.
     - For conceptual/definition questions, answer with the conceptual definition from the document, not an implementation function or code snippet.
     - If the context contains both a prose definition and implementation code, prefer the prose definition unless explicitly asked for code.
     - Include the important defining details explicitly stated in the context, such as formulas/values (e.g., 1 and 0), named terminology (e.g., Fiedler Value), minimum/maximum conditions, and relevant start/target concepts.

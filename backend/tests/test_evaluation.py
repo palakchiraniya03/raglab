@@ -16,16 +16,22 @@ def test_evaluation_run_endpoint(monkeypatch):
                 sources=[]
             )
         elif "adjacency matrix" in req.query.lower():
-            # q01: fail - missing "1" and "0"
+            # q01: pass - missing "1" and "0" but uses acceptable term "presence"
             return RAGResponse(
-                answer="The adjacency matrix A is an important concept.",
+                answer="The adjacency matrix indicates presence of an edge or absence.",
                 sources=[RetrievalResult(text="The adjacency matrix A is defined by A_i,j = 1 if (v_i, v_j) belongs to E, and 0 otherwise.", score=0.9, metadata={"filename": "test.pdf"})]
             )
         elif "degree matrix" in req.query.lower():
             # q02: fail - missing "diagonal matrix"
             return RAGResponse(
-                answer="The degree matrix D is a matrix where D_i,i = deg(v_i).",
+                answer="The degree matrix D is not a diagonal matrix.",
                 sources=[RetrievalResult(text="The degree matrix D is a diagonal matrix where D_i,i = deg(v_i).", score=0.9, metadata={"filename": "test.pdf"})]
+            )
+        elif "unnormalized" in req.query.lower():
+            # q03: fail - negates L
+            return RAGResponse(
+                answer="It is never L.",
+                sources=[RetrievalResult(text="L = D - A", score=0.9, metadata={"filename": "test.pdf"})]
             )
         elif "shortest path length" in req.query.lower():
             # q09: pass - uses alternative "minimum number of edges" instead of "distance"
@@ -60,15 +66,17 @@ def test_evaluation_run_endpoint(monkeypatch):
 
     results = {r["id"]: r for r in data["results"]}
 
-    # q01 should fail
-    assert results["q01"]["answer_passed"] == False
-    assert "1" in results["q01"]["missing_answer_terms"]
+    # q01 should pass with acceptable terms
+    assert results["q01"]["answer_passed"] == True
+    assert len(results["q01"]["missing_answer_terms"]) == 0
 
-    # q02 should fail
+    # q02 should fail because 'diagonal matrix' is negated
     assert results["q02"]["answer_passed"] == False
     assert "diagonal matrix" in results["q02"]["missing_answer_terms"]
 
-    # q09 should pass using alternative
+    # q03 should fail because 'L' is negated
+    assert results["q03"]["answer_passed"] == False
+    assert "L" in results["q03"]["missing_answer_terms"]
     assert results["q09"]["answer_passed"] == True
     assert len(results["q09"]["missing_answer_terms"]) == 0
 
@@ -114,23 +122,19 @@ def test_is_chunk_relevant():
     q2 = {
         "expected_terms": ["BFS", "Queue"]
     }
-    # No multi-word terms. Any single term works.
-    assert is_chunk_relevant("We use a Queue here.", q2) == True
+    # It now strictly checks the primary term (BFS)
+    assert is_chunk_relevant("We use a Queue here.", q2) == False
     assert is_chunk_relevant("We use BFS.", q2) == True
     assert is_chunk_relevant("Stack", q2) == False
     
     q3 = {
         "expected_terms": ["shortest path length", "minimum", "distance"],
         "acceptable_terms": {
-            "distance": ["minimum number of edges"]
+            "shortest path length": ["distance"]
         }
     }
-    # Primary term (shortest path length) missing
-    assert is_chunk_relevant("This is the shortest path length.", q3) == True
-    # If acceptable term for a single word is present, wait... the logic says:
-    # if multi_word_terms: return found_any_multi
-    # Because q3 has "shortest path length", it requires that term to be found!
-    assert is_chunk_relevant("This is the minimum distance.", q3) == False
+    # Primary term (shortest path length) missing but acceptable alternative present
+    assert is_chunk_relevant("This is the minimum distance.", q3) == True
 
 def test_chunk_level_metrics(monkeypatch):
     from app.schemas import RAGResponse, RetrievalResult

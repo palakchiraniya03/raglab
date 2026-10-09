@@ -9,6 +9,10 @@
       "1",
       "0"
     ],
+    "acceptable_terms": {
+      "1": ["presence of an edge", "presence", "1"],
+      "0": ["absence of an edge", "absence", "0"]
+    },
     "answerable": true
   },
   {
@@ -21,6 +25,10 @@
       "diagonal matrix",
       "deg"
     ],
+    "acceptable_terms": {
+      "diagonal matrix": ["diagonal matrix", "diagonal", "off-diagonals are zero", "i=j"],
+      "deg": ["deg", "degree"]
+    },
     "answerable": true
   },
   {
@@ -34,6 +42,11 @@
       "D",
       "A"
     ],
+    "acceptable_terms": {
+      "L": ["L", "Laplacian", "Laplacian matrix"],
+      "D": ["D", "degree matrix", "degree"],
+      "A": ["A", "adjacency matrix", "adjacency"]
+    },
     "answerable": true
   },
   {
@@ -47,18 +60,25 @@
       "L",
       "A"
     ],
+    "acceptable_terms": {
+      "L": ["L", "Laplacian", "Laplacian matrix"],
+      "D": ["D", "degree matrix", "degree"],
+      "A": ["A", "adjacency matrix", "adjacency"]
+    },
     "answerable": true
   },
   {
     "id": "q05",
     "category": "mathematical concept",
     "question": "What is algebraic connectivity?",
-    "expected_answer": "Algebraic connectivity (λ2) is the second smallest eigenvalue of the Laplacian matrix L, also called the Fiedler Value.",
+    "expected_answer": "Algebraic connectivity (\u03bb2) is the second smallest eigenvalue of the Laplacian matrix L, also called the Fiedler Value.",
     "expected_terms": [
       "algebraic connectivity",
-      "second smallest eigenvalue",
-      "Fiedler"
+      "second smallest eigenvalue"
     ],
+    "acceptable_terms": {
+      "second smallest eigenvalue": ["second smallest eigenvalue", "fiedler", "fiedler value", "fiedler's value"]
+    },
     "answerable": true
   },
   {

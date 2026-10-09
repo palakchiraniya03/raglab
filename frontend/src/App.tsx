@@ -186,7 +186,7 @@ const getRelevantPassage = (chunk: string, query: string) => {
     if (termsFound === 0) score -= 500
     if (windowNorm.includes(phrase)) score += 1000
 
-    const codePatterns = ['np.', 'nx.', 'def ', 'return ', 'toarray', '=', '_', '{', '}', '[', ']', 'λ', 'diag', 'matrix', 'import ']
+    const codePatterns = ['np.', 'nx.', 'def ', 'return ', 'toarray', '=', '_', '{', '}', '[', ']', 'Î»', 'diag', 'matrix', 'import ']
     const lowerWindowOrig = windowOrig.toLowerCase()
     for (const pat of codePatterns) {
       score -= (lowerWindowOrig.split(pat).length - 1) * 3
@@ -233,7 +233,7 @@ const getRelevantPassage = (chunk: string, query: string) => {
   }
 }
 
-function SourceCard({ source, query, index }: { source: RetrievalResult, query: string, index: number }) {
+function SourceCard({ source, query, index, id }: { source: RetrievalResult, query: string, index: number, id?: string }) {
   const [expanded, setExpanded] = useState(false)
   const isLong = source.text.length > 300
 
@@ -242,7 +242,7 @@ function SourceCard({ source, query, index }: { source: RetrievalResult, query: 
   }, [source.text, query])
 
   return (
-    <div className="bg-[#262626] border border-white/5 rounded-xl p-4 flex flex-col gap-3">
+    <div id={id} className="bg-[#262626] border border-white/5 rounded-xl p-4 flex flex-col gap-3 transition-shadow">
        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500 border-b border-white/5 pb-3">
           <span className="font-medium text-gray-300 flex items-center gap-1.5">
             <FileText className="w-3.5 h-3.5" />
@@ -314,7 +314,7 @@ function RetrievalInspector({ query, sources }: { query: string, sources: Retrie
              {sources.map((src, idx) => (
                <div key={idx} className="flex flex-col">
                   <div className="text-gray-300 font-medium mb-3">
-                    {src.metadata.filename} {src.metadata.page !== null ? `· Page ${src.metadata.page}` : ''} · Chunk {src.metadata.chunk_index}
+                    {src.metadata.filename} {src.metadata.page !== null ? `Â· Page ${src.metadata.page}` : ''} Â· Chunk {src.metadata.chunk_index}
                   </div>
                   <div className="font-mono text-[12.5px] flex flex-col gap-1.5">
                     <div className="flex justify-between max-w-[280px]">
@@ -334,7 +334,7 @@ function RetrievalInspector({ query, sources }: { query: string, sources: Retrie
                       <span>0.500</span>
                     </div>
                     <div className="mt-1 text-emerald-500/80">
-                      {src.selected !== false ? '✓ Selected' : '✗ Dropped'}
+                      {src.selected !== false ? 'âœ“ Selected' : 'âœ— Dropped'}
                     </div>
                   </div>
                </div>
@@ -719,6 +719,46 @@ function KnowledgeBaseExplorer({
   )
 }
 
+
+function renderMessageContent(content: string, msgIdx: number) {
+  const citationRegex = /\[Source\s+(\d+)\]/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = citationRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(content.substring(lastIndex, match.index));
+    }
+    const sourceIdx = parseInt(match[1], 10);
+    parts.push(
+      <a
+        key={`cite-${msgIdx}-${match.index}`}
+        href={`#source-${msgIdx}-${sourceIdx}`}
+        onClick={(e) => {
+          e.preventDefault();
+          document.getElementById(`source-${msgIdx}-${sourceIdx}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const el = document.getElementById(`source-${msgIdx}-${sourceIdx}`);
+          if (el) {
+            el.style.transition = 'box-shadow 0.3s';
+            el.style.boxShadow = '0 0 0 2px #10b981';
+            setTimeout(() => { el.style.boxShadow = 'none'; }, 2000);
+          }
+        }}
+        className="inline-flex items-center justify-center bg-[#252525] hover:bg-[#333] border border-[#444] text-[10px] text-gray-300 font-mono px-1.5 py-0.5 rounded mx-1 align-text-bottom transition-colors cursor-pointer no-underline"
+        title={`View Source ${sourceIdx}`}
+      >
+        {sourceIdx}
+      </a>
+    );
+    lastIndex = citationRegex.lastIndex;
+  }
+  if (lastIndex < content.length) {
+    parts.push(content.substring(lastIndex));
+  }
+  return <>{parts}</>;
+}
+
 function App() {
   const [backendStatus, setBackendStatus] = useState<string>('checking...')
 
@@ -735,7 +775,7 @@ function App() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [activeView, setActiveView] = useState<'chat' | 'evaluation' | 'knowledge'>('chat')
   const [sessionsLoaded, setSessionsLoaded] = useState(false)
-  
+
   // Knowledge Base Explorer state
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null)
   const [documentChunks, setDocumentChunks] = useState<ChunkResponse[]>([])
@@ -1208,7 +1248,7 @@ function App() {
 
                                       {/* Answer Text */}
                                       <div className="text-[16px] text-gray-200 leading-relaxed whitespace-pre-wrap">
-                                         {msg.content}
+                                         {renderMessageContent(msg.content, msgIdx)}
                                       </div>
 
                                       {/* Retrieval Inspector */}
@@ -1220,17 +1260,24 @@ function App() {
                                       {msg.reproducibility && (
                                          <ReproducibilityInspector info={msg.reproducibility} />
                                       )}
-
-                                     {/* Sources Block */}
+                                      {/* Sources Block */}
                                       {msg.sources && msg.sources.length > 0 && (
-                                         <div className="mt-6 border-t border-white/5 pt-5">
-                                            <div className="text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-4">Sources</div>
-                                            <div className="flex flex-col gap-3">
-                                                {msg.sources.map((source, idx) => (
-                                                   <SourceCard key={idx} source={source} query={activeSession!.messages[msgIdx - 1]?.content || ''} index={idx + 1} />
-                                                ))}
-                                            </div>
-                                         </div>
+                                        <div className="mt-6 border-t border-white/5 pt-5">
+                                          <div className="text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                                            Sources
+                                          </div>
+                                          <div className="flex flex-col gap-3">
+                                            {msg.sources.map((source, idx) => (
+                                              <SourceCard
+                                                key={idx}
+                                                source={source}
+                                                query={activeSession!.messages[msgIdx - 1]?.content || ''}
+                                                index={idx + 1}
+                                                id={`source-${msgIdx}-${idx + 1}`}
+                                              />
+                                            ))}
+                                          </div>
+                                        </div>
                                       )}
                                    </div>
                                 </div>
@@ -1265,13 +1312,13 @@ function App() {
                    )}
 
                    <div className="flex gap-2 mb-3">
-                     <button 
+                     <button
                        onClick={() => setOperation('ask')}
                        className={`px-3 py-1.5 rounded-full text-[12px] font-medium transition-colors ${operation === 'ask' ? 'bg-[#404040] text-white' : 'text-gray-400 hover:text-gray-200 hover:bg-[#303030]'}`}
                      >
                         Ask
                      </button>
-                     <button 
+                     <button
                        onClick={() => setOperation('compare')}
                        className={`px-3 py-1.5 rounded-full text-[12px] font-medium transition-colors ${operation === 'compare' ? 'bg-[#404040] text-white' : 'text-gray-400 hover:text-gray-200 hover:bg-[#303030]'}`}
                      >
