@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from app.services.vector_storage import get_document_chunks, VectorStorageError
 
-@patch("app.services.vector_storage.client")
+@patch("app.services.vector_storage._client")
 def test_get_document_chunks_success(mock_client):
     from app.config import settings
 
@@ -53,7 +53,7 @@ def test_get_document_chunks_success(mock_client):
     assert doc_filter.must[0].key == "document_id"
     assert doc_filter.must[0].match.value == "doc_123"
 
-@patch("app.services.vector_storage.client")
+@patch("app.services.vector_storage._client")
 def test_get_document_chunks_empty_or_no_collection(mock_client):
     from app.config import settings
     
@@ -78,7 +78,7 @@ def test_get_document_chunks_empty_or_no_collection(mock_client):
     assert result2 == []
     assert mock_client.scroll.called
 
-@patch("app.services.vector_storage.client")
+@patch("app.services.vector_storage._client")
 def test_get_document_chunks_error(mock_client):
     from app.config import settings
     
