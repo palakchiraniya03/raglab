@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     QDRANT_COLLECTION: str = "raglab_documents"
 
     # Phase 4 Configuration
-    GENERATION_MODEL: str = "gemma3:1b"
+    GENERATION_MODEL: str = "llama3.1:8b"
     RETRIEVAL_SCORE_THRESHOLD: float = 0.50
     RAG_MAX_CONTEXT_CHUNKS: int = 3
     LEXICAL_BOOST_WEIGHT: float = 0.07

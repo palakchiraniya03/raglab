@@ -1,0 +1,362 @@
+{
+  "label": "gemma3-1b",
+  "model_reported": null,
+  "captured_at": "2026-10-14T02:28:17.216301+00:00",
+  "data": {
+    "summary": {
+      "total_questions": 10,
+      "answerable_questions": 9,
+      "unanswerable_questions": 1,
+      "retrieval_success_count": 0,
+      "answer_term_pass_count": 0,
+      "refusal_success_count": 0,
+      "average_latency": 2.337365221977234,
+      "avg_precision_at_k": 0.0,
+      "avg_mrr": 0.0,
+      "retrieval_hit_rate": 0.0,
+      "citation_valid_count": 0,
+      "citation_checked_count": 0,
+      "unsupported_citation_count": 0
+    },
+    "results": [
+      {
+        "id": "q01",
+        "category": "conceptual definition",
+        "question": "What is an adjacency matrix?",
+        "answerable": true,
+        "answer": "Error: 500: Retrieval failed: Embedding failed: Failed to connect to Ollama: All connection attempts failed",
+        "expected_terms": [
+          "adjacency matrix",
+          "1",
+          "0"
+        ],
+        "missing_answer_terms": [
+          "adjacency matrix",
+          "1"
+        ],
+        "missing_source_terms": [
+          "adjacency matrix",
+          "1",
+          "0"
+        ],
+        "sources_count": 0,
+        "has_sources": false,
+        "answer_passed": false,
+        "sources_passed": false,
+        "latency": 2.4013237953186035,
+        "diagnosis": "Likely retrieval failure",
+        "retrieval_hit": false,
+        "precision_at_k": 0.0,
+        "mrr": 0.0,
+        "reproducibility": null,
+        "retrieved_chunks_info": [],
+        "citation_validation": null
+      },
+      {
+        "id": "q02",
+        "category": "conceptual definition",
+        "question": "What is a degree matrix?",
+        "answerable": true,
+        "answer": "Error: 500: Retrieval failed: Embedding failed: Failed to connect to Ollama: All connection attempts failed",
+        "expected_terms": [
+          "degree matrix",
+          "diagonal matrix",
+          "deg"
+        ],
+        "missing_answer_terms": [
+          "degree matrix",
+          "diagonal matrix",
+          "deg"
+        ],
+        "missing_source_terms": [
+          "degree matrix",
+          "diagonal matrix",
+          "deg"
+        ],
+        "sources_count": 0,
+        "has_sources": false,
+        "answer_passed": false,
+        "sources_passed": false,
+        "latency": 2.353343963623047,
+        "diagnosis": "Likely retrieval failure",
+        "retrieval_hit": false,
+        "precision_at_k": 0.0,
+        "mrr": 0.0,
+        "reproducibility": null,
+        "retrieved_chunks_info": [],
+        "citation_validation": null
+      },
+      {
+        "id": "q03",
+        "category": "mathematical concept",
+        "question": "What is the unnormalized Laplacian matrix?",
+        "answerable": true,
+        "answer": "Error: 500: Retrieval failed: Embedding failed: Failed to connect to Ollama: All connection attempts failed",
+        "expected_terms": [
+          "unnormalized laplacian",
+          "L",
+          "D",
+          "A"
+        ],
+        "missing_answer_terms": [
+          "unnormalized laplacian"
+        ],
+        "missing_source_terms": [
+          "unnormalized laplacian",
+          "L",
+          "D",
+          "A"
+        ],
+        "sources_count": 0,
+        "has_sources": false,
+        "answer_passed": false,
+        "sources_passed": false,
+        "latency": 2.326031446456909,
+        "diagnosis": "Likely retrieval failure",
+        "retrieval_hit": false,
+        "precision_at_k": 0.0,
+        "mrr": 0.0,
+        "reproducibility": null,
+        "retrieved_chunks_info": [],
+        "citation_validation": null
+      },
+      {
+        "id": "q04",
+        "category": "mathematical concept",
+        "question": "What is the normalized Laplacian matrix?",
+        "answerable": true,
+        "answer": "Error: 500: Retrieval failed: Embedding failed: Failed to connect to Ollama: All connection attempts failed",
+        "expected_terms": [
+          "normalized laplacian",
+          "D",
+          "L",
+          "A"
+        ],
+        "missing_answer_terms": [
+          "normalized laplacian"
+        ],
+        "missing_source_terms": [
+          "normalized laplacian",
+          "D",
+          "L",
+          "A"
+        ],
+        "sources_count": 0,
+        "has_sources": false,
+        "answer_passed": false,
+        "sources_passed": false,
+        "latency": 2.3516156673431396,
+        "diagnosis": "Likely retrieval failure",
+        "retrieval_hit": false,
+        "precision_at_k": 0.0,
+        "mrr": 0.0,
+        "reproducibility": null,
+        "retrieved_chunks_info": [],
+        "citation_validation": null
+      },
+      {
+        "id": "q05",
+        "category": "mathematical concept",
+        "question": "What is algebraic connectivity?",
+        "answerable": true,
+        "answer": "Error: 500: Retrieval failed: Embedding failed: Failed to connect to Ollama: All connection attempts failed",
+        "expected_terms": [
+          "algebraic connectivity",
+          "second smallest eigenvalue"
+        ],
+        "missing_answer_terms": [
+          "algebraic connectivity",
+          "second smallest eigenvalue"
+        ],
+        "missing_source_terms": [
+          "algebraic connectivity",
+          "second smallest eigenvalue"
+        ],
+        "sources_count": 0,
+        "has_sources": false,
+        "answer_passed": false,
+        "sources_passed": false,
+        "latency": 2.3125181198120117,
+        "diagnosis": "Likely retrieval failure",
+        "retrieval_hit": false,
+        "precision_at_k": 0.0,
+        "mrr": 0.0,
+        "reproducibility": null,
+        "retrieved_chunks_info": [],
+        "citation_validation": null
+      },
+      {
+        "id": "q06",
+        "category": "algorithm",
+        "question": "What is Breadth-First Search (BFS)?",
+        "answerable": true,
+        "answer": "Error: 500: Retrieval failed: Embedding failed: Failed to connect to Ollama: All connection attempts failed",
+        "expected_terms": [
+          "BFS",
+          "layer-by-layer",
+          "source node",
+          "Queue"
+        ],
+        "missing_answer_terms": [
+          "BFS",
+          "layer-by-layer",
+          "source node",
+          "Queue"
+        ],
+        "missing_source_terms": [
+          "BFS",
+          "layer-by-layer",
+          "source node",
+          "Queue"
+        ],
+        "sources_count": 0,
+        "has_sources": false,
+        "answer_passed": false,
+        "sources_passed": false,
+        "latency": 2.337181568145752,
+        "diagnosis": "Likely retrieval failure",
+        "retrieval_hit": false,
+        "precision_at_k": 0.0,
+        "mrr": 0.0,
+        "reproducibility": null,
+        "retrieved_chunks_info": [],
+        "citation_validation": null
+      },
+      {
+        "id": "q07",
+        "category": "algorithm",
+        "question": "What is Depth-First Search (DFS)?",
+        "answerable": true,
+        "answer": "Error: 500: Retrieval failed: Embedding failed: Failed to connect to Ollama: All connection attempts failed",
+        "expected_terms": [
+          "DFS",
+          "deep",
+          "backtracking",
+          "Stack",
+          "Recursion"
+        ],
+        "missing_answer_terms": [
+          "DFS",
+          "deep",
+          "backtracking",
+          "Stack",
+          "Recursion"
+        ],
+        "missing_source_terms": [
+          "DFS",
+          "deep",
+          "backtracking",
+          "Stack",
+          "Recursion"
+        ],
+        "sources_count": 0,
+        "has_sources": false,
+        "answer_passed": false,
+        "sources_passed": false,
+        "latency": 2.3351004123687744,
+        "diagnosis": "Likely retrieval failure",
+        "retrieval_hit": false,
+        "precision_at_k": 0.0,
+        "mrr": 0.0,
+        "reproducibility": null,
+        "retrieved_chunks_info": [],
+        "citation_validation": null
+      },
+      {
+        "id": "q08",
+        "category": "graph theory",
+        "question": "What is a shortest path?",
+        "answerable": true,
+        "answer": "Error: 500: Retrieval failed: Embedding failed: Failed to connect to Ollama: All connection attempts failed",
+        "expected_terms": [
+          "shortest path",
+          "minimum",
+          "start node",
+          "target node"
+        ],
+        "missing_answer_terms": [
+          "shortest path",
+          "minimum",
+          "start node",
+          "target node"
+        ],
+        "missing_source_terms": [
+          "shortest path",
+          "minimum",
+          "start node",
+          "target node"
+        ],
+        "sources_count": 0,
+        "has_sources": false,
+        "answer_passed": false,
+        "sources_passed": false,
+        "latency": 2.322481155395508,
+        "diagnosis": "Likely retrieval failure",
+        "retrieval_hit": false,
+        "precision_at_k": 0.0,
+        "mrr": 0.0,
+        "reproducibility": null,
+        "retrieved_chunks_info": [],
+        "citation_validation": null
+      },
+      {
+        "id": "q09",
+        "category": "graph theory",
+        "question": "What is shortest path length?",
+        "answerable": true,
+        "answer": "Error: 500: Retrieval failed: Embedding failed: Failed to connect to Ollama: All connection attempts failed",
+        "expected_terms": [
+          "shortest path length",
+          "minimum",
+          "distance"
+        ],
+        "missing_answer_terms": [
+          "shortest path length",
+          "minimum",
+          "distance"
+        ],
+        "missing_source_terms": [
+          "shortest path length",
+          "minimum",
+          "distance"
+        ],
+        "sources_count": 0,
+        "has_sources": false,
+        "answer_passed": false,
+        "sources_passed": false,
+        "latency": 2.31230092048645,
+        "diagnosis": "Likely retrieval failure",
+        "retrieval_hit": false,
+        "precision_at_k": 0.0,
+        "mrr": 0.0,
+        "reproducibility": null,
+        "retrieved_chunks_info": [],
+        "citation_validation": null
+      },
+      {
+        "id": "q10",
+        "category": "refusal",
+        "question": "What is the capital of France?",
+        "answerable": false,
+        "answer": "Error: 500: Retrieval failed: Embedding failed: Failed to connect to Ollama: All connection attempts failed",
+        "expected_terms": [],
+        "missing_answer_terms": [
+          "Unanswerable fallback missing"
+        ],
+        "missing_source_terms": [],
+        "sources_count": 0,
+        "has_sources": false,
+        "answer_passed": false,
+        "sources_passed": true,
+        "latency": 2.3217551708221436,
+        "diagnosis": "Unanswerable fallback missing",
+        "retrieval_hit": null,
+        "precision_at_k": null,
+        "mrr": null,
+        "reproducibility": null,
+        "retrieved_chunks_info": null,
+        "citation_validation": null
+      }
+    ]
+  }
+}

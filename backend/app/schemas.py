@@ -73,6 +73,13 @@ class ChunkEvalInfo(BaseModel):
     metadata: dict
     is_relevant: bool
 
+class CitationValidation(BaseModel):
+    valid: bool
+    reason: str
+    citation_count: int = 0
+    invalid_indices: List[str] = []
+    unsupported: List[str] = []
+
 class EvaluationCaseResult(BaseModel):
     id: str
     category: str
@@ -93,6 +100,7 @@ class EvaluationCaseResult(BaseModel):
     mrr: Optional[float] = None
     reproducibility: Optional[ReproducibilityInfo] = None
     retrieved_chunks_info: Optional[List[ChunkEvalInfo]] = None
+    citation_validation: Optional[CitationValidation] = None
 
 class EvaluationSummary(BaseModel):
     total_questions: int
@@ -105,6 +113,9 @@ class EvaluationSummary(BaseModel):
     avg_precision_at_k: float = 0.0
     avg_mrr: float = 0.0
     retrieval_hit_rate: float = 0.0
+    citation_valid_count: int = 0
+    citation_checked_count: int = 0
+    unsupported_citation_count: int = 0
 
 class EvaluationResponse(BaseModel):
     summary: EvaluationSummary

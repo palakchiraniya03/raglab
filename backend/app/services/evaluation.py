@@ -6,7 +6,7 @@ import re
 import asyncio
 from fastapi import HTTPException
 from app.api.rag import ask_question
-from app.schemas import RetrievalRequest, EvaluationResponse, EvaluationSummary, EvaluationCaseResult, ChunkEvalInfo
+from app.schemas import RetrievalRequest, EvaluationResponse, EvaluationSummary, EvaluationCaseResult, ChunkEvalInfo, CitationValidation
 
 EVALUATION_CASE_TIMEOUT_SECONDS = 120
 
@@ -86,6 +86,10 @@ async def run_evaluation() -> EvaluationResponse:
     sum_mrr = 0.0
     total_retrieval_hits = 0
 
+    citation_valid_count = 0
+    citation_checked_count = 0
+    unsupported_citation_count = 0
+
     results = []
 
     for q in questions:
@@ -128,6 +132,7 @@ async def run_evaluation() -> EvaluationResponse:
         precision_at_k = None
         mrr = None
         retrieved_chunks_info = None
+        citation_validation = None
 
         if q['answerable']:
             answerable_count += 1
@@ -204,6 +209,15 @@ async def run_evaluation() -> EvaluationResponse:
                 total_retrieval_hits += 1
             sum_precision += precision_at_k
             sum_mrr += mrr
+
+            # Citation faithfulness check (only meaningful when sources exist)
+            if has_sources:
+                citation_result = validate_citations(answer, sources, q['expected_terms'])
+                citation_validation = CitationValidation(**citation_result)
+                citation_checked_count += 1
+                if citation_validation.valid:
+                    citation_valid_count += 1
+                unsupported_citation_count += len(citation_validation.unsupported)
         else:
             unanswerable_count += 1
             unanswerable_indicators = ['not available', 'don\'t know', 'do not know', 'sorry', 'cannot answer', 'not mention', 'no information']
@@ -235,7 +249,8 @@ async def run_evaluation() -> EvaluationResponse:
             precision_at_k=precision_at_k,
             mrr=mrr,
             reproducibility=reproducibility,
-            retrieved_chunks_info=retrieved_chunks_info
+            retrieved_chunks_info=retrieved_chunks_info,
+            citation_validation=citation_validation
         ))
 
     avg_latency = total_latency / total if total > 0 else 0
@@ -255,7 +270,10 @@ async def run_evaluation() -> EvaluationResponse:
         average_latency=avg_latency,
         avg_precision_at_k=avg_precision,
         avg_mrr=avg_mrr,
-        retrieval_hit_rate=hit_rate
+        retrieval_hit_rate=hit_rate,
+        citation_valid_count=citation_valid_count,
+        citation_checked_count=citation_checked_count,
+        unsupported_citation_count=unsupported_citation_count
     )
 
     return EvaluationResponse(summary=summary, results=results)
