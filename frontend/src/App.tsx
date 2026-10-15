@@ -358,7 +358,25 @@ function EvaluationDashboard() {
     try {
       const res = await fetch('http://localhost:8000/api/evaluation/run', { method: 'POST' })
       if (!res.ok) {
-        throw new Error('Evaluation failed')
+        let errorDetail = `Status ${res.status}: ${res.statusText || 'Evaluation request failed'}`
+        try {
+          const rawText = await res.text()
+          if (rawText) {
+            try {
+              const errData = JSON.parse(rawText)
+              if (errData?.detail) {
+                errorDetail = `${errData.detail} (HTTP ${res.status})`
+              } else {
+                errorDetail = `${rawText} (HTTP ${res.status})`
+              }
+            } catch {
+              errorDetail = `${rawText} (HTTP ${res.status})`
+            }
+          }
+        } catch {
+          // If reading response body fails, keep fallback errorDetail
+        }
+        throw new Error(errorDetail)
       }
       const json = await res.json()
       setData(json)
@@ -386,6 +404,13 @@ function EvaluationDashboard() {
             Run Evaluation
           </button>
         </div>
+
+        {loading && (
+          <div className="p-4 bg-blue-900/20 border border-blue-900/30 rounded-xl text-blue-300 text-sm flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin shrink-0 text-blue-400" />
+            <span>Evaluation is running across 10 questions. Check your backend console logs to see which question is currently processing.</span>
+          </div>
+        )}
 
         {error && (
           <div className="p-4 bg-red-900/20 border border-red-900/30 rounded-xl text-red-400 text-sm flex items-center gap-2">

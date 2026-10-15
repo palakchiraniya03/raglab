@@ -92,6 +92,25 @@
       "source node",
       "Queue"
     ],
+    "acceptable_terms": {
+      "BFS": [
+        "BFS",
+        "breadth-first search",
+        "breadth first search"
+      ],
+      "layer-by-layer": [
+        "layer-by-layer",
+        "layer by layer",
+        "level-wise",
+        "level by level",
+        "level-by-level"
+      ],
+      "source node": [
+        "source node",
+        "start node",
+        "starting node"
+      ]
+    },
     "answerable": true
   },
   {

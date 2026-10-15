@@ -5,7 +5,9 @@ import unicodedata
 import re
 import asyncio
 from fastapi import HTTPException
+from app.config import settings
 from app.api.rag import ask_question
+from app.services.generation import generate_text
 from app.schemas import RetrievalRequest, EvaluationResponse, EvaluationSummary, EvaluationCaseResult, ChunkEvalInfo
 
 EVALUATION_CASE_TIMEOUT_SECONDS = 120
@@ -88,12 +90,24 @@ async def run_evaluation() -> EvaluationResponse:
 
     results = []
 
-    for q in questions:
+    print(f"\n[Evaluation] Starting evaluation run for {total} questions...", flush=True)
+
+    # Warm up generation model once to avoid cold-start model load causing timeouts on q01
+    try:
+        print(f"[Evaluation] Warming up generation model '{settings.GENERATION_MODEL}'...", flush=True)
+        await generate_text("ping")
+        print("[Evaluation] Generation model is ready.", flush=True)
+    except Exception as e:
+        print(f"[Evaluation] Warm-up notice (continuing anyway): {e}", flush=True)
+
+    for idx, q in enumerate(questions, 1):
+        print(f"[Evaluation] [{idx}/{total}] Starting question {q['id']}: \"{q['question']}\"", flush=True)
         start_time = time.time()
         reproducibility = None
 
         try:
             req = RetrievalRequest(query=q['question'], top_k=5)
+            req._sources_sink = []
             res_data = await asyncio.wait_for(
                 ask_question(req),
                 timeout=EVALUATION_CASE_TIMEOUT_SECONDS
@@ -102,17 +116,20 @@ async def run_evaluation() -> EvaluationResponse:
             sources = res_data.sources
             reproducibility = res_data.reproducibility
         except asyncio.TimeoutError:
-            answer = "Evaluation timed out after 30 seconds."
-            sources = []
+            answer = f"Evaluation timed out after {EVALUATION_CASE_TIMEOUT_SECONDS} seconds."
+            sources = getattr(req, "_sources_sink", [])
+            print(f"[Evaluation] [{idx}/{total}] TIMEOUT for question {q['id']} after {EVALUATION_CASE_TIMEOUT_SECONDS}s", flush=True)
         except Exception as e:
             answer = f"Error: {str(e)}"
-            sources = []
+            sources = getattr(req, "_sources_sink", [])
+            print(f"[Evaluation] [{idx}/{total}] ERROR for question {q['id']}: {e}", flush=True)
 
         latency = time.time() - start_time
         total_latency += latency
 
         sources_count = len(sources)
         has_sources = sources_count > 0
+        print(f"[Evaluation] [{idx}/{total}] Completed question {q['id']} in {latency:.2f}s (sources: {sources_count})", flush=True)
 
         norm_answer = normalize_text(answer)
         combined_sources_text = " ".join([s.text for s in sources])
@@ -239,6 +256,7 @@ async def run_evaluation() -> EvaluationResponse:
         ))
 
     avg_latency = total_latency / total if total > 0 else 0
+    print(f"[Evaluation] Completed {total} questions in {total_latency:.2f}s (avg: {avg_latency:.2f}s/query)\n", flush=True)
     refusal_success_count = sum(1 for r in results if not r.answerable and r.answer_passed)
 
     avg_precision = sum_precision / answerable_count if answerable_count > 0 else 0.0

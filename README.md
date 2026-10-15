@@ -365,6 +365,39 @@ was retained because it preserved relevant passages effectively for the tested d
 No unnecessary change was made to the production configuration based on this experiment.
 
 ---
+### Experiment 3 — Generation Model Comparison
+
+RAGLab was evaluated with two locally hosted generation models using the same 10-question benchmark, document knowledge base, retrieval pipeline, and answer-evaluation framework.
+
+#### Observed Results
+
+| Metric | Gemma 3:1b | Llama 3.1:8b |
+|---|---:|---:|
+| Answer success | 7/9 | 7/9 |
+| Retrieval success | 9/9 | 9/9 |
+| Average latency | 17.55 s/query | 81.26 s/query |
+| Generation timeouts | Not reported in the baseline | 2 |
+
+The benchmark contains nine answerable questions and one intentionally unanswerable question. Answer success is measured over the nine answerable questions; refusal success is assessed separately.
+
+#### Observations
+
+- Both models achieved the same observed answer success and retrieval success in these runs.
+- Llama 3.1:8b had substantially higher latency on the CPU-based development machine.
+- The Llama run timed out on q01 (adjacency matrix) and q06 (Breadth-First Search), despite a successful model warm-up.
+- Retrieved sources were preserved for timed-out cases so that retrieval performance could be distinguished from generation failures.
+- Acceptable BFS terminology was expanded to recognize common wording variants. This changes answer matching criteria and should not be interpreted as an improvement in the model's actual answer quality.
+
+#### Decision
+
+Gemma 3:1b remains the default generation model because it achieved the same observed answer success with substantially lower latency in these experiments.
+
+These results are specific to the tested benchmark and hardware. They do not establish that one model is universally more accurate than the other.
+
+#### Limitations
+
+The benchmark is small, and generation latency varies with local model loading and CPU inference. A timeout means an answer could not be fully evaluated; it does not establish whether the answer would ultimately have been correct.
+---
 ### Retrieval Parameter Tuning
 
 RAGLab exposes several retrieval parameters that control how candidate

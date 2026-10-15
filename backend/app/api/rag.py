@@ -42,6 +42,10 @@ async def ask_question(request: RetrievalRequest):
     from app.config import settings
     sources = sources[:settings.RAG_MAX_CONTEXT_CHUNKS]
 
+    # Attach retrieved sources to request object if a sink is provided (used by evaluation across timeouts)
+    if hasattr(request, "_sources_sink") and request._sources_sink is not None:
+        request._sources_sink.extend(sources)
+
     # 2. Check if context is found
     if not sources:
         return RAGResponse(
