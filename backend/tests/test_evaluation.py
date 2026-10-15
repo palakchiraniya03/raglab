@@ -100,7 +100,7 @@ def test_evaluation_timeout(monkeypatch):
     assert len(data["results"]) == 10
 
     for res in data["results"]:
-        assert res["answer"] == "Evaluation timed out after 30 seconds."
+        assert res["answer"] == "Evaluation timed out after 0.01 seconds."
         assert res["sources_count"] == 0
         assert res["has_sources"] == False
         if res["answerable"]:
